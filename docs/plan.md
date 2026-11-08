@@ -14,14 +14,16 @@ Group A · Team 5（吳傢澂、歐冠廷、吳承羲）
   - slides 76–77：Evaluation Strategy、超參數
 - `presentation/graph/08_EDA_Supplement/eda_results.md`：EDA 補充結果，由 `eda_supplement.py` 產生
 
+**維護規則**：本文件是所有設計決策的依據。任何改變資料處理、訓練、評估行為或產出的修改，都要在同一個 commit 更新本文件的對應章節（含第 2.3 節目錄結構、第 10 節 checklist）。
+
 **現況**
 
 | 階段 | 狀態 | 備註 |
 |---|---|---|
 | Data Understanding | ✅ 完成 | EDA 與補充分析已完成，結論整理於第 3 節 |
 | Data Preparation | ✅ 完成 | `src/prepare_data.py`；產出與統計見 `data/processed/data_summary.md` |
-| Data Modeling | ⬜ | |
-| Evaluation | ⬜ | |
+| Data Modeling | ✅ 完成 | baseline 與 9 個 seed-42 runs；結果見 `reports/seed42/` |
+| Evaluation | 🔄 表格完成 | `evaluate.py` 的結果表與 FP／FN 統計已產出；第 6.4 節人工閱讀錯誤樣本、第 6.5 節文獻比較、第 6.6 節解讀待補 |
 | Refinement | ⬜ | 等主實驗完成後決定要做哪些 |
 | Deployment（選做） | ⬜ | |
 
@@ -109,6 +111,8 @@ nycu-data-science-project/
 ├── outputs/                  # 每個 run 一個資料夾（gitignored）
 │   ├── {model}_{setting}/
 │   └── smoke/{model}_{setting}/
+├── reports/seed42/           # seed-42 主實驗的 evaluate.py 輸出與程式版本說明（納入 git）
+├── tests/                    # checkpoint 存讀的回歸測試（unittest，CPU）
 ├── src/
 │   ├── common.py             # 路徑、LABELS、label mapping、clean()、metric 函式、build_augmented()、fingerprint()
 │   ├── prepare_data.py       # Phase 2
@@ -288,8 +292,9 @@ nycu-data-science-project/
 | 模型權重 | 一律以 fp32 載入（`dtype=torch.float32`）。transformers v5 預設沿用 checkpoint 的 dtype，而 `deberta-v3-base` 存成 fp16，會導致 fp16 master weights 發散 | （補充） |
 | Per-device batch | 16；OOM 時用 `--batch-size 8`，程式自動設 `gradient_accumulation_steps=2`，effective batch 維持 16 | （補充） |
 | Padding | dynamic padding（`DataCollatorWithPadding`）＋ length grouping（v5 寫法：`train_sampling_strategy="group_by_length"`）。v5 開啟後連 eval／predict 也會打亂順序，所以 eval 改用 sequential sampler，預測依長度排序後再還原原順序。訓練的 length-grouped 順序只由 (seed, epoch) 決定，中途 `--resume` 的那個 epoch 和沒中斷時完全相同（v5 內建 sampler 在中途接續時順序會錯） | （補充） |
-| 推論精度 | 最終的 val／test 預測用 fp32（不經 bf16 autocast），避免 logits 落在 bf16 格點上造成 ROC-AUC 同分；訓練中的 val 評估仍用 bf16 | （補充） |
+| 推論精度 | 最終的 val／test 預測用 fp32（不經 bf16 autocast），避免 logits 落在 bf16 格點上造成 ROC-AUC 同分；訓練中的 val 評估仍用 bf16。val 的 fp32 預測要和 Trainer 的 bf16 預測通過對齊檢查：逐元素差的 99.9 百分位 < 0.05，且沒有任何值差超過 0.25（兩者都記在 `runtime.json`），否則中止 | （補充） |
 | Evaluation 頻率 | 每 0.5 epoch 對 val 評估一次，共 6 個候選 checkpoint；訓練結束時 Trainer 會再評估一次最後一步 | （補充） |
+| Checkpoint 格式 | 存檔用 `save_pretrained(save_original_format=False)`，保留 runtime 的 key 名稱。`bert-base-uncased` 使用舊的 `LayerNorm.gamma/beta`，transformers 5.22.1 預設存檔會改回舊名，但 Trainer 載回 best／resume checkpoint 時用 `load_state_dict(strict=False)` 且不做轉換，會靜默跳過所有 LayerNorm 權重。回歸測試：`tests/test_checkpoint_roundtrip.py` | （補充） |
 | Checkpoint 保存 | 保留 best 和 last：`save_total_limit=2`、`load_best_model_at_end=True`、`metric_for_best_model="mean_roc_auc"` | （補充） |
 
 - 同一個 run 內，所有 setting 都用相同的超參數，不針對單一 setting 調參。
@@ -336,7 +341,7 @@ nycu-data-science-project/
 ### 5.5 GPU 時間粗估
 - 公式：時間 ≈ epochs × 訓練筆數 ÷ samples/s，再加上 val 評估和三個資料集的推論。
 - E1/E2 的訓練筆數約為 E0 的兩倍，所以每個 run 的時間也約為兩倍。
-- 9 個 runs 總計粗估 18–25 小時。smoke test 後用實測的 samples/s 更新這個數字。
+- RTX 5070 實測：9 個 runs 合計約 7 小時（DeBERTa E0／E1／E2 為 0.69／1.18／1.17 小時），明細見 `docs/run_guide.md` 第 9 節。
 
 ---
 
@@ -409,8 +414,8 @@ Smoke 輸出可以用 `--outputs outputs/smoke` 測試整個評估流程。Boots
 |---|---|---|---|
 | 1 | Bootstrap 95% CI | 在 Jigsaw test 上做 1,000 次 paired resampling：同一組 row index 同時用於兩個 setting，算 Δ Mean ROC-AUC 和 per-label Δ，取 2.5／97.5 百分位 | 不需重新訓練，只改 `evaluate.py` |
 | 2 | Per-label threshold | 在 val 上為每個 label 搜尋 0.05–0.95（step 0.01）中 F1 最高的 threshold，套用到 test，**另外報告**，不取代 0.5 的主結果 | 不需重新訓練 |
-| 3 | DeBERTa 多 seed | E0／E1／E2 用 seed 43、44 各再訓練一次，報告 3 個 seed 的 mean ± std；資料切分和外部樣本維持 seed 42，只換訓練 seed | +6 runs，約 8–10 小時 |
-| 4 | Augmentation 比例消融 | DeBERTa E1／E2 改用 0.5:1 和 2:1，從 `civil_pool_perm.parquet` 取前 0.5n／2n 筆，觀察增益和資料量的關係 | +4 runs，約 6–10 小時 |
+| 3 | DeBERTa 多 seed | E0／E1／E2 用 seed 43、44 各再訓練一次，報告 3 個 seed 的 mean ± std；資料切分和外部樣本維持 seed 42，只換訓練 seed | +6 runs，RTX 5070 約 6 小時 |
+| 4 | Augmentation 比例消融 | DeBERTa E1／E2 改用 0.5:1 和 2:1，從 `civil_pool_perm.parquet` 取前 0.5n／2n 筆，觀察增益和資料量的關係 | +4 runs，RTX 5070 約 5 小時（依訓練筆數由實測線性推算） |
 
 **判斷規則**
 - 第 1、2 項成本很低，主實驗完成後直接做。
@@ -457,17 +462,17 @@ Smoke 輸出可以用 `--outputs outputs/smoke` 測試整個評估流程。Boots
 - [x] `prepare_data.py` 的 assert 全部通過
 
 **模型（每個 run）**
-- [ ] `config.json`：參數、資料筆數、套件版本、git commit hash
-- [ ] `log_history.json`、`runtime.json`
-- [ ] `preds_val`、`preds_test_jigsaw`、`preds_test_civil` 三個 parquet
-- [ ] best 和 last checkpoint
+- [x] `config.json`：參數、資料筆數、套件版本、git commit hash
+- [x] `log_history.json`、`runtime.json`
+- [x] `preds_val`、`preds_test_jigsaw`、`preds_test_civil` 三個 parquet
+- [x] best 和 last checkpoint（Transformer 的保留在執行者電腦上，未上傳）
 
 **結果**
-- [ ] `outputs/results.md`：主表、per-label 表、Δ 表、cross-dataset 表
+- [x] `outputs/results.md`：主表、per-label 表、Δ 表、cross-dataset 表（seed-42 版本收在 `reports/seed42/`）
 - [ ] 錯誤分析紀錄
 - [ ] Refinement 結果（有做的項目）
 
 **重現性**
-- [ ] 所有隨機性都固定為 seed 42：切分、抽樣、shuffle、訓練（Refinement 多 seed 除外）
-- [ ] `requirements.txt` 固定版本號
-- [ ] 每個 run 都記錄 git commit hash，確保結果對應到特定版本的程式碼
+- [x] 所有隨機性都固定為 seed 42：切分、抽樣、shuffle、訓練（Refinement 多 seed 除外）
+- [x] `requirements.txt` 固定版本號
+- [x] 每個 run 都記錄 git commit hash，確保結果對應到特定版本的程式碼（seed-42 Transformer runs 記為 `17a4da8-dirty`、baseline 記為 `49dcf61-dirty`，實際版本見 `reports/seed42/README.md`；之後的 runs 從乾淨的 commit 執行）

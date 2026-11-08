@@ -129,8 +129,8 @@ python src/train.py --model bert --setting e0 --smoke
 
 每個都要看到最後一行 `Done: ...`。結果在 `outputs/smoke/` 底下。Smoke test 只跑 90 步左右，val 分數低（0.6–0.9）是正常的。
 
-打開 **DeBERTa** 的 `outputs/smoke/deberta_e0/runtime.json`，看 `peak_vram_reserved_gb`（三個模型中 DeBERTa 最吃記憶體）：
-- 和你的 VRAM 有 1GB 以上的餘裕：正式 run 用預設設定。
+打開三個 smoke 的 `runtime.json`，看 `peak_vram_allocated_gb`（實際用量）。`peak_vram_reserved_gb` 含 PyTorch 的快取，正式 run 中 BERT 的 reserved 可到 11.7GB，但 allocated 只有約 3GB，不代表會 OOM。seed-42 正式 run 的 allocated 以 DeBERTa 最高（約 6.5GB）：
+- DeBERTa 的 allocated 和你的 VRAM 有 1GB 以上的餘裕：正式 run 用預設設定。
 - 接近上限，或 smoke test 出現 `CUDA out of memory`：9 個正式 run **全部**加上 `--batch-size 8`。這不會改變實驗設定，effective batch 仍是 16，資料順序也相同。
 
 ---
@@ -237,19 +237,30 @@ Checkpoint 請先保留，等我們確認結果沒問題再刪。之後做 demo 
 
 ---
 
-## 9. 本機實測數據（參考）
+## 9. 實測數據（參考）
 
-以下是在 RTX 4060 Ti 8GB（bf16）上跑 smoke test 量到的數字。正式 run 的時間由 samples/s 推算，只是粗估；RTX 5070 應該會更快。
+`peak_vram_allocated_gb` 是實際用量；`peak_vram_reserved_gb` 另含 PyTorch 的快取，會隨可用 VRAM 變大，不能拿來判斷會不會 OOM。
 
-| Model | Train samples/s | 峰值 VRAM（reserved） | 預估訓練時間 E0／E1／E2 |
+**RTX 5070 12GB，seed-42 正式 run（bf16，`--batch-size 16`）**
+
+| Model | Train samples/s | 峰值 VRAM allocated（reserved） | 實際總時間 E0／E1／E2 |
 |---|---|---|---|
-| DeBERTa-v3 | 56–77 | 8.0GB | 約 2h／3h／3h |
-| RoBERTa | 91–137 | 4.3GB | 約 1.3h／2h／2h |
-| BERT | 126–144 | 4.3GB | 約 1h／1.4h／1.4h |
+| DeBERTa-v3 | 202–222 | 6.47GB（8.9GB） | 0.69h／1.18h／1.17h |
+| RoBERTa | 356–370 | 3.19GB（7.1GB） | 0.40h／0.71h／0.71h |
+| BERT | 369–380 | 3.02–3.03GB（11.7GB） | 0.49h／0.86h／0.84h |
 
-- 以上都是預設的 `--batch-size 16`。BERT 也用 8 測過 grad-accum，兩者結果等價；正式 run 請 9 個都用同一個值。
-- smoke 只跑 90 步，samples/s 波動不小，表中給範圍。
-- 9 個 runs 合計約 17 小時，再加上 val 評估和最後的 fp32 預測（DeBERTa 每個 run 約 30 分鐘，BERT／RoBERTa 較短），約 20 小時。
-- 峰值 VRAM 出現在最後的 fp32 預測。DeBERTa 用到 8.0GB，12GB 的卡用預設設定即可；8GB 的卡建議全部加 `--batch-size 8`。
+- 總時間取自 `outputs/execution/queue.status.json` 的 `wall_seconds`，含載入、訓練、val 評估和最後的 fp32 預測。9 個 runs 合計約 7 小時。
+
+**RTX 4060 Ti 8GB，smoke test（bf16，`--batch-size 16`）**
+
+| Model | Train samples/s | 峰值 VRAM allocated（reserved） |
+|---|---|---|
+| DeBERTa-v3 | 56–77 | 6.45–6.47GB（7.95–8.34GB） |
+| RoBERTa | 91–137 | 3.19GB（4.3GB） |
+| BERT | 91–144 | 3.03GB（4.3GB） |
+
+- smoke 只跑 90 步，samples/s 波動不小，表中給多次 smoke 的範圍（BERT 的下限 91 來自 2026-11-09 的重跑）。
+- BERT 也用 `--batch-size 8` 測過 grad-accum，兩者結果等價；正式 run 請 9 個都用同一個值。
+- 峰值 VRAM 出現在最後的 fp32 預測，三個模型中 DeBERTa 的 allocated 最高（6.47GB）。依第 4 節的規則判斷：12GB 的卡用預設設定；8GB 的卡約有 1.5GB 餘裕，也可以用預設設定，但 smoke test 若出現 OOM 就全部改用 `--batch-size 8`。
 
 Refinement 階段可能還會請你跑額外的 runs，例如不同 seed 或不同外部資料比例。屆時會另外提供指令。

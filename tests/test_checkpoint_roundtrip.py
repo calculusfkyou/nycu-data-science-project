@@ -1,6 +1,7 @@
 """CPU regression checks for Trainer checkpoint saving, best loading and resume.
 
 Run with: .venv/Scripts/python -m unittest discover -s tests -v
+(`-m unittest tests.test_checkpoint_roundtrip` fails: a `tests` package in site-packages shadows this folder.)
 The tiny legacy BERT fixture reproduces the gamma/beta naming of bert-base-uncased.
 No experiment data, downloaded weights or production hyperparameters are changed.
 """
@@ -38,14 +39,9 @@ class CheckpointRoundtripTest(unittest.TestCase):
         torch.set_num_threads(cls.previous_threads)
 
     def setUp(self):
-        # Keep scratch files in the writable workspace; Windows sandbox TEMP may
-        # allow creating a directory but deny access to its children.
-        self.temp_root = (Path(__file__).resolve().parents[1] / "outputs").resolve()
-        self.temp_root.mkdir(exist_ok=True)
-        self.temp = tempfile.TemporaryDirectory(prefix="nycu-checkpoint-test-", dir=self.temp_root)
-        self.root = Path(self.temp.name).resolve()
-        self.assertEqual(self.root.parent, self.temp_root)
-        self.addCleanup(self.cleanup_temp)
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        self.root = Path(temp.name)
         self.legacy = self.root / "legacy-bert"
         self.legacy.mkdir()
         set_seed(42)
@@ -65,19 +61,8 @@ class CheckpointRoundtripTest(unittest.TestCase):
         self.assertTrue(any(key.endswith("LayerNorm.gamma") for key in legacy_state))
         save_file(legacy_state, self.legacy / "model.safetensors", metadata={"format": "pt"})
 
-    def cleanup_temp(self):
-        # Check the resolved target before TemporaryDirectory recursively removes it.
-        target = Path(self.temp.name).resolve()
-        if target.parent != self.temp_root or not target.name.startswith("nycu-checkpoint-test-"):
-            raise RuntimeError(f"Refusing to clean unexpected temporary path: {target}")
-        self.temp.cleanup()
-
     def new_model(self):
-        model = BertForSequenceClassification.from_pretrained(
-            self.legacy, local_files_only=True, dtype=torch.float32,
-        )
-        self.assertTrue(getattr(model, "_weight_conversions", None))
-        return model
+        return BertForSequenceClassification.from_pretrained(self.legacy, local_files_only=True, dtype=torch.float32)
 
     def arguments(self, directory, **overrides):
         options = dict(

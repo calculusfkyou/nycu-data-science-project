@@ -6,7 +6,7 @@ NYCU 數據科學專題 · Group A · Team 5（吳傢澂、歐冠廷、吳承羲
 - 加入 Civil Comments 作為外部資料，能不能提升分類表現？
 - 外部資料用 hard label 或 soft label，結果會不會不同？
 
-完整的執行計畫見 [docs/plan.md](docs/plan.md)。
+完整的執行計畫見 [docs/plan.md](docs/plan.md)，它是所有設計決策的依據。修改資料處理、訓練、評估的行為或產出時，請在同一個 commit 更新 plan.md 的對應章節。
 
 ## 實驗設定
 
@@ -25,8 +25,8 @@ NYCU 數據科學專題 · Group A · Team 5（吳傢澂、歐冠廷、吳承羲
 |---|---|---|
 | Data Understanding | ✅ | EDA，在 repo 外完成 |
 | Data Preparation | ✅ | `src/prepare_data.py` |
-| Data Modeling | 🔄 baseline 完成；Transformer 程式已通過 smoke test，9 個 runs 待跑 | `src/baseline.py`、`src/train.py` |
-| Evaluation | 🔄 程式完成，等待實驗結果 | `src/evaluate.py` |
+| Data Modeling | ✅ baseline 與 9 個 seed-42 runs 完成 | `src/baseline.py`、`src/train.py` |
+| Evaluation | 🔄 結果表完成（[reports/seed42/](reports/seed42/)），錯誤分析與解讀待補 | `src/evaluate.py` |
 | Refinement | ⬜ | 主實驗完成後再決定 |
 | Deployment（選做） | ⬜ | `src/demo.py` |
 
@@ -94,6 +94,8 @@ datasets/
 ├── datasets/          # 原始資料（gitignored）
 ├── data/processed/    # prepare_data.py 產出（gitignored）
 ├── outputs/           # 訓練與評估產出（gitignored）
+├── reports/seed42/    # seed-42 主實驗結果（evaluate.py 輸出）
+├── tests/             # checkpoint 存讀的回歸測試
 ├── docs/
 │   ├── plan.md        # 執行計畫
 │   └── run_guide.md   # 實驗執行指南
@@ -122,3 +124,9 @@ datasets/
 
 - `train.py` 的完整參數與執行順序見 [docs/run_guide.md](docs/run_guide.md)。
 - `evaluate.py` 讀 `outputs/*/preds_*.parquet`，產出 `outputs/results.md`。
+
+回歸測試（CPU，不需要資料或網路）：
+
+```bash
+.venv/Scripts/python -m unittest discover -s tests -v
+```

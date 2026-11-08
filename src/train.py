@@ -97,8 +97,11 @@ class EpochSeededLengthSampler(LengthGroupedSampler):
 
 class ProjectTrainer(Trainer):
     def _save(self, output_dir=None, state_dict=None):
-        # Trainer reloads checkpoints with load_state_dict, without HF's legacy key conversion.
-        # Keep runtime names (e.g. LayerNorm.weight/bias), so best-model and resume loads are exact.
+        # Workaround for transformers 5.22.1. bert-base-uncased ships legacy LayerNorm.gamma/beta keys;
+        # the default save_pretrained writes them back, but Trainer reloads best/resume checkpoints with
+        # load_state_dict(strict=False) and no key conversion, silently skipping all LayerNorm weights.
+        # Keep runtime names (LayerNorm.weight/bias) so those loads are exact. Drop when upstream fixes it.
+        # from_pretrained still loads these checkpoints.
         output_dir = Path(output_dir or self.args.output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
         model = self.accelerator.unwrap_model(self.model, keep_torch_compile=False)
@@ -265,9 +268,15 @@ def main():
             write_json(run_dir / "metrics_val.json", m)
             # Alignment checks. (1) Element-wise: the fp32 predictions (length-sorted, then restored) must match
             # Trainer.predict's bf16 predictions taken in plain row order; only bf16 rounding may differ.
+            # Not on the max: the max over ~96k values sits in the bf16 tail (seed-42 runs reached 0.047).
+            # The 99.9th percentile catches a global mix-up (thousands of values move toward 1); the count of
+            # values off by > 0.25 catches a local one (e.g. a single shifted batch), which p999 tolerates.
             bf16_probs = sigmoid(trainer.predict(ds).predictions)
-            max_diff = float(np.abs(probs - bf16_probs).max())
-            assert max_diff < 0.05, f"val predictions misaligned: max |fp32 - bf16| = {max_diff:.4f}"
+            diff = np.abs(probs - bf16_probs)
+            max_diff, p999_diff = float(diff.max()), float(np.quantile(diff, 0.999))
+            n_far = int((diff > 0.25).sum())
+            assert p999_diff < 0.05 and n_far == 0, (
+                f"val predictions misaligned: 99.9th pct |fp32 - bf16| = {p999_diff:.4f}, {n_far} values > 0.25")
             # (2) Against the labels: a row mix-up would drop the score to ~0.5. Only a warning, so a borderline
             # fp32-vs-bf16 gap can't abort a finished run; (1) is the strict check.
             gap = abs(m["mean_roc_auc"] - trainer.state.best_metric)
@@ -281,7 +290,7 @@ def main():
         "prepare_seconds": round(t_prep, 1), "train_seconds": round(t_train, 1),
         "train_samples_per_second": train_out.metrics.get("train_samples_per_second"),
         "predict_seconds": predict_seconds,
-        "val_max_abs_diff_fp32_vs_bf16": max_diff,
+        "val_max_abs_diff_fp32_vs_bf16": max_diff, "val_p999_abs_diff_fp32_vs_bf16": p999_diff,
         "val_mean_roc_auc_fp32_minus_training": m["mean_roc_auc"] - trainer.state.best_metric,
         "peak_vram_allocated_gb": round(torch.cuda.max_memory_allocated() / 2**30, 2),
         "peak_vram_reserved_gb": round(torch.cuda.max_memory_reserved() / 2**30, 2),

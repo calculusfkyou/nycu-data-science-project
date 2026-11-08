@@ -8,6 +8,7 @@ Metrics follow plan §6.1; F1 uses threshold 0.5.
 
 | Run | Model | Setting | Val mean ROC-AUC | Mean ROC-AUC | Mean PR-AUC | Macro F1 |
 |---|---|---|---|---|---|---|
+| tfidf_lr_e0 | tfidf_lr | e0 | 0.9859 | 0.9801 | 0.6198 | 0.5422 |
 | bert_e0 | bert | e0 | 0.9903 | 0.9856 | 0.6523 | 0.5853 |
 | bert_e1 | bert | e1 | 0.9907 | 0.9863 | 0.6684 | 0.5999 |
 | bert_e2 | bert | e2 | 0.9917 | 0.9864 | 0.6852 | 0.6263 |
@@ -24,6 +25,7 @@ Metrics follow plan §6.1; F1 uses threshold 0.5.
 
 | Run | toxic | severe_toxic | obscene | threat | insult | identity_hate |
 |---|---|---|---|---|---|---|
+| tfidf_lr_e0 | 0.9657 | 0.9845 | 0.9786 | 0.9930 | 0.9725 | 0.9862 |
 | bert_e0 | 0.9734 | 0.9896 | 0.9807 | 0.9961 | 0.9810 | 0.9927 |
 | bert_e1 | 0.9763 | 0.9900 | 0.9823 | 0.9961 | 0.9807 | 0.9921 |
 | bert_e2 | 0.9743 | 0.9901 | 0.9825 | 0.9971 | 0.9814 | 0.9929 |
@@ -38,6 +40,7 @@ Metrics follow plan §6.1; F1 uses threshold 0.5.
 
 | Run | toxic | severe_toxic | obscene | threat | insult | identity_hate |
 |---|---|---|---|---|---|---|
+| tfidf_lr_e0 | 0.7853 | 0.3144 | 0.8010 | 0.4981 | 0.7360 | 0.5839 |
 | bert_e0 | 0.8095 | 0.3531 | 0.7886 | 0.4981 | 0.7819 | 0.6825 |
 | bert_e1 | 0.8243 | 0.3453 | 0.8106 | 0.5860 | 0.7586 | 0.6857 |
 | bert_e2 | 0.8075 | 0.3537 | 0.8116 | 0.6329 | 0.7915 | 0.7139 |
@@ -96,6 +99,7 @@ Metrics follow plan §6.1; F1 uses threshold 0.5.
 
 | Run | Mean ROC-AUC | Mean PR-AUC | Macro F1 |
 |---|---|---|---|
+| tfidf_lr_e0 | 0.8937 | 0.2896 | 0.1588 |
 | bert_e0 | 0.9439 | 0.4045 | 0.3306 |
 | bert_e1 | 0.9721 | 0.5769 | 0.5539 |
 | bert_e2 | 0.9797 | 0.5890 | 0.4979 |
@@ -110,6 +114,7 @@ Metrics follow plan §6.1; F1 uses threshold 0.5.
 
 | Run | toxic | obscene | threat | insult | identity_hate |
 |---|---|---|---|---|---|
+| tfidf_lr_e0 | 0.8666 | 0.9191 | 0.9008 | 0.8608 | 0.9212 |
 | bert_e0 | 0.9249 | 0.9684 | 0.9442 | 0.9342 | 0.9481 |
 | bert_e1 | 0.9613 | 0.9862 | 0.9646 | 0.9702 | 0.9780 |
 | bert_e2 | 0.9649 | 0.9886 | 0.9871 | 0.9731 | 0.9850 |
@@ -124,6 +129,7 @@ Metrics follow plan §6.1; F1 uses threshold 0.5.
 
 | Run | toxic | obscene | threat | insult | identity_hate |
 |---|---|---|---|---|---|
+| tfidf_lr_e0 | 0.4983 | 0.2400 | 0.1047 | 0.4510 | 0.1540 |
 | bert_e0 | 0.5971 | 0.3554 | 0.2519 | 0.5989 | 0.2190 |
 | bert_e1 | 0.7542 | 0.5914 | 0.3682 | 0.7640 | 0.4065 |
 | bert_e2 | 0.7488 | 0.5755 | 0.4244 | 0.7757 | 0.4206 |
