@@ -11,6 +11,7 @@ scipy==1.18.1
 matplotlib==3.11.2
 
 # Modeling (Phase 3)
+joblib==1.6.0
 transformers==5.22.1
 accelerate==1.15.0
 datasets==5.1.0

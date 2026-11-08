@@ -253,7 +253,7 @@ nycu-data-science-project/
   - 兩者用 `scipy.sparse.hstack` 合併，共 200,000 維
 - **分類器**：每個 label 各訓練一個 `LogisticRegression`（`solver="liblinear"`）
 - **調參**：C 從 {0.5, 1, 2, 4} 中，用 val 的 Mean ROC-AUC 挑選
-- **輸出**：和 Transformer 相同格式的 prediction 檔（第 5.4 節），讓 `evaluate.py` 統一處理
+- **輸出**：和 Transformer 相同格式的 prediction 檔（第 5.4 節），讓 `evaluate.py` 統一處理；另存 `model.joblib`（兩個 vectorizer 和選定 C 的六個 LR），供 demo 或之後重用，不必重新訓練（補充）
 
 ### 5.2 Transformer models
 **程式**：`src/train.py --model {bert,roberta,deberta} --setting {e0,e1,e2} [--smoke] [--batch-size N] [--resume] [--seed N] [--ratio R]`
@@ -331,7 +331,7 @@ nycu-data-science-project/
 - Prediction 檔的格式：`row` 欄是對應 `data/processed/{split}.parquet` 的列號，後面是六個 label 的機率（float32）。test_civil 也輸出六類，評估時只用五類。
 - `config.json` 記錄訓練資料和每個 eval split 的 data fingerprint（`common.fingerprint()`），以及 Hugging Face 權重的 commit（`checkpoint_revision`）。`evaluate.py` 會和本機的 `data/processed` 比對（訓練資料用 `common.load_train()` 重建後比對），不一致就停止，避免在不同電腦產生的資料上對錯列，或 E1／E2 用到不同批外部樣本。
 - `--resume` 時保留原本的 `config.json`，只在 `resume_sessions` 附加這次的環境紀錄。
-- baseline 也輸出相同格式，放在 `outputs/tfidf_lr_e0/`。
+- baseline 也輸出相同格式，放在 `outputs/tfidf_lr_e0/`；另有 `model.joblib`（第 5.1 節），沒有 checkpoint 和 `log_history.json`。
 
 ### 5.5 GPU 時間粗估
 - 公式：時間 ≈ epochs × 訓練筆數 ÷ samples/s，再加上 val 評估和三個資料集的推論。

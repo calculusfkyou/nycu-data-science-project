@@ -1,12 +1,14 @@
 """Phase 3 baseline: TF-IDF + one LogisticRegression per label, E0 only (docs/plan.md §5.1).
 
-Picks C on val mean ROC-AUC, then writes the same prediction files as train.py to outputs/tfidf_lr_e0/.
+Picks C on val mean ROC-AUC, then writes the same prediction files as train.py to outputs/tfidf_lr_e0/,
+plus model.joblib ({"vectorizers": {...}, "classifiers": {label: LogisticRegression}}).
 CPU only.
 
 Run: .venv/Scripts/python src/baseline.py
 """
 import time
 
+import joblib
 import numpy as np
 import pandas as pd
 from scipy.sparse import hstack
@@ -22,7 +24,7 @@ VECTORIZERS = {
     "word": dict(analyzer="word", ngram_range=(1, 2), max_features=100_000, sublinear_tf=True),
     "char_wb": dict(analyzer="char_wb", ngram_range=(2, 5), max_features=100_000, sublinear_tf=True),
 }
-PACKAGES = ["numpy", "pandas", "pyarrow", "scikit-learn", "scipy"]
+PACKAGES = ["joblib", "numpy", "pandas", "pyarrow", "scikit-learn", "scipy"]
 
 run_dir = OUTPUTS / RUN
 run_dir.mkdir(parents=True, exist_ok=True)
@@ -53,6 +55,12 @@ for s, df in evals.items():
     save_predictions(run_dir, s, np.arange(len(df)), probs)
     if s == "val":
         write_json(run_dir / "metrics_val.json", compute_metrics(df[LABELS], probs, LABELS))
+
+# Fitted vectorizers + chosen-C classifiers for reuse (e.g. demo.py). stop_words_ is introspection-only and
+# holds every char n-gram cut by max_features, so drop it before pickling (sklearn docs).
+for v in vecs.values():
+    v.stop_words_ = None
+joblib.dump({"vectorizers": vecs, "classifiers": dict(zip(LABELS, models[best_c]))}, run_dir / "model.joblib")
 
 write_json(run_dir / "config.json", {
     "run": RUN, "model": "tfidf_lr", "setting": "e0", "seed": SEED, "smoke": False,
