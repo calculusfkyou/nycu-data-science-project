@@ -118,6 +118,7 @@ nycu-data-science-project/
 │   ├── prepare_data.py       # Phase 2
 │   ├── baseline.py           # Phase 3：TF-IDF + LR
 │   ├── train.py              # Phase 3：--model {bert,roberta,deberta} --setting {e0,e1,e2}
+│   ├── ensemble.py           # 第 6.7 節：三個 Transformer 的等權重 ensemble（補充）
 │   ├── evaluate.py           # Phase 4：讀 predictions，產出結果表
 │   └── demo.py               # Phase 6（選做）
 ├── docs/
@@ -401,7 +402,7 @@ Smoke 輸出可以用 `--outputs outputs/smoke` 測試整個評估流程。Boots
 |---|---|---|
 | Rahman et al. (2023)，baseline 參考 | AUROC 0.973 | 傳統 ML，最佳單一設定 |
 | Mazari et al. (2024)，SOTA 參考 | AUROC 98.63%（Table 2：98.634%） | BERT + Bi-LSTM/Bi-GRU ensemble。在官方 labeled test（63,977 列）上評估，10% training data 留作 validation，但 ensemble 權重依 test 表現設定，等於用 test 調參 |
-| Kaggle 第一名 | 0.98856（private leaderboard，4,539 隊；2026-11-10 查證，來源：MLE-bench 收錄的 Kaggle leaderboard 快照） | 官方 test 的 private 部分；本專案的 test 是全部已標註的列，基準接近但不完全相同 |
+| Kaggle 第一名 | 0.98856（private leaderboard，4,539 隊；2026-11-10 查證，來源：MLE-bench 收錄的 Kaggle leaderboard 快照；同一快照第 9、10 名為 0.98775、0.98768） | 官方 test 的 private 部分；本專案的 test 是全部已標註的列，基準接近但不完全相同 |
 
 各論文的切分方式不同，表中數字只作為參考範圍，不能當成同一基準下的排名。`evaluate.py` 把這三列以斜體附在主表下方（只有 Mean ROC-AUC，其他欄填「—」）。
 
@@ -416,6 +417,16 @@ Threshold 指標的參考值（`results.md` 第 9 節，補充）：
 
 - Jigsaw test 中 threat 只有 211 個正例、severe_toxic 只有 367 個，這兩類的 Δ 容易受少數樣本影響。
 - 主實驗每個設定只跑一個 seed。Δ 很小時，不能直接下結論，要搭配第 7 節的 bootstrap CI（多 seed 決定不做）。
+
+### 6.7 同一評估下的比較方法：ensemble（補充）
+第 6.5 節的文獻數字評估設定不同，只能當參考。為了和 SOTA／比賽常用的方法在同一套資料切分與 test 上比較，加入 ensemble：Mazari et al. (2024) 和 Kaggle 前幾名都使用 ensemble。
+- **程式**：`src/ensemble.py`，在 `evaluate.py` 之前執行。
+- **做法**：每個 setting 取 BERT、RoBERTa、DeBERTa 三個 run（ratio 1、seed 42）的機率等權重平均，輸出成 `outputs/ensemble_{setting}/`，格式和訓練 run 相同，由 `evaluate.py` 一併產生主表、Δ 表、bootstrap CI、threshold 與第 9 節的指標。
+- **不調參**：ensemble 是看過單一模型結果後才加入的事後分析，不屬於原本規劃的 RQ 檢定；但只用唯一的自然設定（三個 Transformer 全用、權重各 1/3），沒有比較其他組合或權重，也不用 test 選擇。
+- **執行順序**：任何 member 重跑後，要先重跑 `ensemble.py` 再跑 `evaluate.py`；否則 `evaluate.py` 會沿用舊的 `outputs/ensemble_*`（fingerprint 檢查抓不到，因為資料沒變，變的是預測）。
+- 參考值另外列 Mazari 的 BERT-3_Models (AVG)（ROC-AUC 98.559%，Table 3：macro F1 60.51%、MCC 60.27%）：它和本專案一樣是等權重、不用 test 設定權重，是較公平的對照。
+- **要回答的問題**：(1) 和文獻、Kaggle 參考值相比的位置；(2) 在 ensemble 上，外部資料（E1／E2 − E0）是否仍有增益。
+- 不重現 Mazari 原文的 BiLSTM／BiGRU 分支，也不重現 Kaggle 第一名的完整流程（pseudo-labeling、翻譯增強等），成本過高，仍以第 6.5 節的數字作參考。
 
 ---
 

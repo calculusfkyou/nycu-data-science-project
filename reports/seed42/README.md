@@ -1,6 +1,6 @@
 # seed-42 主實驗結果
 
-9 個 Transformer runs（BERT／RoBERTa／DeBERTa-v3 × E0／E1／E2），seed 42，batch 16，3 epochs，RTX 5070（bf16），加上本機 CPU 跑的 TF-IDF + LR baseline（只有 E0）。本資料夾的 `results.md`、`metrics_long.csv`、`bootstrap_ci.csv`、`val_curves.png` 是 `src/evaluate.py` 對這 10 個 runs 的原始輸出；`analysis.md` 是依這些結果撰寫的錯誤分析與解讀（plan §6.4、§6.6）。
+9 個 Transformer runs（BERT／RoBERTa／DeBERTa-v3 × E0／E1／E2），seed 42，batch 16，3 epochs，RTX 5070（bf16），加上本機 CPU 跑的 TF-IDF + LR baseline（只有 E0）。本資料夾的 `results.md`、`metrics_long.csv`、`bootstrap_ci.csv`、`val_curves.png` 是 `src/evaluate.py` 對這 10 個 runs 和 3 個 ensemble（`src/ensemble.py`：三個 Transformer 同 setting 的等權重平均，plan §6.7）的原始輸出；`analysis.md` 是依這些結果撰寫的錯誤分析與解讀（plan §6.4、§6.6）。
 
 ## 程式版本
 
@@ -24,6 +24,7 @@
 - 內含每個 run 的 prediction parquets、config／runtime／log、執行紀錄，以及 `results.md` 第 5 節提到的 `error_samples_deberta.csv`（含原始留言，不放進 repo）。
 - 不含 checkpoint（依 `docs/run_guide.md` 的估計，每個 run 2.6–4.2GB），保留在執行者的電腦上。
 - 不含 TF-IDF baseline；baseline 的輸出在本機 `outputs/tfidf_lr_e0/`（gitignored）。
+- 不含 ensemble；`ensemble_e0／e1／e2` 是用 release 的預測檔，以 `src/ensemble.py` 在本機重建（`outputs/ensemble_*/config.json` 記錄重建時的 commit 與成員的 commit）。
 
 ## 解讀注意
 

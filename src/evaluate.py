@@ -21,7 +21,7 @@ from sklearn.metrics import (accuracy_score, f1_score, hamming_loss, matthews_co
 from common import (EVAL_SPLITS, F1_THRESHOLD, LABELS, OUTPUTS, PROCESSED, SEED, SPLIT_LABELS, compute_metrics, fingerprint,
                     load_train, md_table)
 
-MODEL_ORDER = ["tfidf_lr", "bert", "roberta", "deberta"]
+MODEL_ORDER = ["tfidf_lr", "bert", "roberta", "deberta", "ensemble"]  # ensemble: src/ensemble.py (plan §6.7)
 DELTAS = [("e1", "e0", "E1 − E0（hard augmentation）"), ("e2", "e0", "E2 − E0（soft augmentation）"),
           ("e2", "e1", "E2 − E1（soft vs. hard）")]
 FOCUS_LABELS = ["threat", "identity_hate"]  # plan §6.4: read 20 E0 false negatives each
@@ -129,7 +129,8 @@ def tables(metrics) -> list[str]:
     md += ["斜體列是參考值（plan §6.5），評估設定和本專案不同，只作為範圍參考，不是同一基準下的排名："
            "Rahman 用自己的切分；Mazari 在官方 labeled test（63,977 列）上評估，但 ensemble 權重依 test 表現設定；"
            "Kaggle private leaderboard 用的是官方 test 中的 private 部分，本表的 test 是全部已標註的列。"
-           "Precision、Recall、MCC、Micro F1、Hamming loss、accuracy 和文獻的比較見第 9 節。", ""]
+           "Precision、Recall、MCC、Micro F1、Hamming loss、accuracy 和文獻的比較見第 9 節。"
+           "ensemble_* 是 BERT、RoBERTa、DeBERTa 三個同 setting run 的等權重機率平均（plan §6.7，src/ensemble.py）。", ""]
 
     md += ["## 2. Per-label：Jigsaw official labeled test", ""]
     for key, name in [("roc_auc", "ROC-AUC"), ("pr_auc", "PR-AUC")]:

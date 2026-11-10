@@ -1,7 +1,7 @@
 # seed-42 結果分析（Evaluation §6.4、§6.6）
 
 依據：
-- 同資料夾的 `results.md`（10 個 runs，Jigsaw official labeled test 63,978 列）
+- 同資料夾的 `results.md`（10 個 runs 和 3 個 ensemble，Jigsaw official labeled test 63,978 列）
 - release 內的 `error_samples_deberta.csv`（含原始留言）
 - `data/processed/data_summary.md`（各訓練集的正例數）
 - `docs/plan.md` §6.5（文獻與 Kaggle 參考值）
@@ -16,7 +16,7 @@
 
 ### 1.1 Transformer 與 baseline
 - 三個 Transformer 的 Mean ROC-AUC（0.9843–0.9864）都高於 TF-IDF + LR baseline（0.9801），差距 +0.004～+0.006；Mean PR-AUC 差距 +0.01～+0.07。
-- Baseline 0.9801 高於 Rahman et al. (2023) 的 0.973。最好的 run（BERT E2，0.9864）和 Mazari et al. (2024) 的 0.9863 相當，但 Mazari 依 test 表現設定 ensemble 權重，不是同一基準；比 Kaggle 第一名（private LB 0.98856，大型 ensemble）低約 0.002。
+- Baseline 0.9801 高於 Rahman et al. (2023) 的 0.973。單一模型中最好的 run（BERT E2，0.9864）和 Mazari et al. (2024) 的 0.9863 相當，但 Mazari 依 test 表現設定 ensemble 權重，不是同一基準；比 Kaggle 第一名（private LB 0.98856，大型 ensemble）低約 0.002。
 - **Threshold 0.5 指標**（`results.md` 第 9 節；Mazari 未說明 threshold，僅供參考）：
   - BERT E0 和 Mazari 的 BERT-base 同為 bert-base-uncased、lr 2e-5、3 epochs（max length 256 vs 128、batch 16 vs 32），結果相近：macro P／R／F1 為 0.480／0.776／0.585，對 0.496／0.777／0.598。
   - BERT E2 的 macro F1 0.626、macro MCC 0.624，略高於 Mazari 最佳 AUC 的 ensemble（0.622、0.616）。
@@ -36,7 +36,7 @@
 
 ### 1.4 模型比較
 - DeBERTa-v3 沒有明顯勝出：Jigsaw test 上 BERT E2 0.9864、DeBERTa E2 0.9862、RoBERTa E2 0.9861，差距 < 0.0005。
-- DeBERTa E2 的 val 分數最高（0.9923），但 val 只用於 checkpoint 選擇，不作為模型比較的依據。
+- 單一模型中 DeBERTa E2 的 val 分數最高（0.9923），但 val 只用於 checkpoint 選擇，不作為模型比較的依據。
 
 ### 1.5 Cross-dataset（Civil test，五類）
 - 三個 Transformer 的 E0 在 Civil test 只有 0.927–0.944，E1／E2 提高到 0.971–0.981。
@@ -65,12 +65,34 @@
 - **soft 優於 hard（Mean，RoBERTa、DeBERTa，seed 42）**：RoBERTa、DeBERTa 的 E2 − E1 不含 0，BERT 含 0；per-label 的反向差異見下一點。
 - **threat**：E2 − E0 三個模型都不含 0，但區間很寬（DeBERTa +0.0087 [+0.0019, +0.0181]），反映 test 只有 211 個正例。
 - **反向的差異也有**：BERT、RoBERTa 的 toxic E2 − E1 為負且不含 0；DeBERTa 的 insult E1 − E0、severe_toxic E2 − E1 也是。外部資料不是對每個 label 都有幫助。
-- 63 個 per-label／Mean 的 CI 中有 33 個不含 0。每個 CI 是單獨計算的，沒有做多重比較校正，個別 label 的結果要保守看待。
+- 三個單一模型的 63 個 per-label／Mean CI 中有 33 個不含 0（加上 ensemble 共 84 個、41 個不含 0）。每個 CI 是單獨計算的，沒有做多重比較校正，個別 label 的結果要保守看待。
 
 **Per-label threshold（val 上選 F1 最高的 threshold）**
 - Transformer 的 threshold 大多落在 0.4–0.7，Macro F1 的變化只有 −0.004～+0.019；baseline +0.0215。所以 threshold 0.5 對 Transformer 大致合適。
 - DeBERTa E2 的增益最大（0.5942 → 0.6135），E0、E1 只有 +0.005、+0.008。調整後 DeBERTa 三個 setting 的 Macro F1 為 0.6015／0.6012／0.6135，E2 在 threshold 0.5 下 F1 偏低的情況（第 1.6 節）有一部分來自 threshold。
-- 調整後的 Macro F1 最高仍是 BERT E2（0.6236）。
+- 單一模型中，調整後的 Macro F1 最高仍是 BERT E2（0.6236）；ensemble 見第 1.8 節。
+
+### 1.8 比較方法：ensemble（plan §6.7）
+文獻數字的評估設定不同（第 1.1 節），所以另外在同一套 test 上加入 SOTA／比賽常用的 ensemble：每個 setting 把 BERT、RoBERTa、DeBERTa 的機率等權重平均。ensemble 是在看過單一模型的結果後才加入的事後分析，不屬於原本規劃的 RQ 檢定；但只用唯一的自然設定（三個 Transformer 全用、等權重），沒有比較其他組合或權重，也沒有用 test 調整。
+
+| Run | Val ROC-AUC | Test ROC-AUC | Mean PR-AUC | Macro F1 | Macro MCC |
+|---|---|---|---|---|---|
+| ensemble_e0 | 0.9927 | 0.9874 | 0.6862 | 0.6238 | 0.6215 |
+| ensemble_e1 | 0.9926 | 0.9875 | 0.6755 | 0.6135 | 0.6187 |
+| ensemble_e2 | 0.9934 | 0.9877 | 0.6997 | 0.6270 | 0.6294 |
+| 最佳單一模型（val 選：DeBERTa E2） | 0.9923 | 0.9862 | 0.6638 | 0.5942 | 0.6043 |
+| *Mazari BERT-3_Models (AVG)*（等權重） | — | 0.9856 | — | 0.6051 | 0.6027 |
+| *Mazari BERT-3_Models (W-AVG)*（權重依 test 設定） | — | 0.9863 | — | 0.6218 | 0.6164 |
+| *Kaggle 第一名* | — | 0.98856 | — | — | — |
+
+- **和參考值的位置**：ensemble_e2 的 test ROC-AUC 0.9877 高於 Mazari 同樣等權重的 BERT-3_Models (AVG) 0.9856，也高於用 test 設定權重的 W-AVG 0.9863；比 Kaggle 第一名低約 0.0008。macro F1、MCC 也略高於 Mazari（Mazari 未說明 threshold）。以 plan §6.5 記錄的 Kaggle private leaderboard 快照（第 9 名 0.98775、第 10 名 0.98768）估算，ensemble_e2（0.98774）約在 4,539 隊中的第 10 名；但 Kaggle private LB 只用官方 test 的一部分，這個名次只能參考。
+- **ensemble 本身的效果**：ensemble_e2 比最佳單一模型高 +0.0015（val 選的 DeBERTa E2），比 test 上最好的單一模型 BERT E2 高 +0.0014（點估計，未做 CI）。
+- **外部資料在 ensemble 上的增益變小**：bootstrap CI（`results.md` 第 7 節）
+  - E1 − E0：+0.0001 [−0.0002, +0.0004]，含 0
+  - E2 − E0：+0.0004 [+0.0001, +0.0006]，不含 0
+  - E2 − E1：+0.0002 [−0.0000, +0.0006]，含 0
+- 單一模型的 E2 − E0 是 +0.0008～+0.0019，ensemble 只剩 +0.0004。外部資料帶來的改善有一部分和 ensemble 的效果重疊（推測，未驗證）。threat 仍是增益最明顯的 label（E2 − E0 +0.0009 [+0.0002, +0.0018]）。
+- 小結：ensemble 的 test ROC-AUC 高於 Mazari 的報告值，但評估設定仍不完全相同（Mazari 依 test 表現設定權重），只能說具競爭力；外部資料（soft label）在 ensemble 上仍有小幅但 CI 不含 0 的增益，hard label 則沒有。
 
 ---
 

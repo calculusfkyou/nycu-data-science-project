@@ -104,6 +104,7 @@ datasets/
 │   ├── prepare_data.py
 │   ├── baseline.py    # TF-IDF + LR（CPU）
 │   ├── train.py       # BERT／RoBERTa／DeBERTa-v3（GPU）
+│   ├── ensemble.py    # 三個 Transformer 的等權重 ensemble（比較方法）
 │   └── evaluate.py    # 讀 predictions，產出 results.md
 └── requirements.txt
 ```
@@ -119,11 +120,16 @@ datasets/
 ```
 
 ```bash
+.venv/Scripts/python src/ensemble.py
+```
+
+```bash
 .venv/Scripts/python src/evaluate.py
 ```
 
 - `train.py` 的完整參數與執行順序見 [docs/run_guide.md](docs/run_guide.md)。
-- `evaluate.py` 讀 `outputs/*/preds_*.parquet`，產出 `outputs/results.md`。
+- `ensemble.py` 把三個 Transformer 同 setting 的預測等權重平均，寫到 `outputs/ensemble_{setting}/`，作為和 SOTA／比賽方法比較用的 ensemble。任何 run 重跑後，要先重跑 `ensemble.py` 再跑 `evaluate.py`。
+- `evaluate.py` 讀 `outputs/*/preds_*.parquet`（含 ensemble），產出 `outputs/results.md`。
 
 回歸測試（CPU，不需要資料或網路）：
 
