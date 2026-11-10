@@ -25,7 +25,7 @@ Group A · Team 5（吳傢澂、歐冠廷、吳承羲）
 | Data Modeling | ✅ 完成 | baseline 與 9 個 seed-42 runs；結果見 `reports/seed42/` |
 | Evaluation | ✅ 完成 | 結果表見 `reports/seed42/results.md`；第 6.4 節錯誤分析與第 6.6 節解讀見 `reports/seed42/analysis.md`（結論以 Refinement 的 bootstrap CI 為準） |
 | Refinement | ✅ 完成 | 只做第 1、2 項（bootstrap CI、per-label threshold），結果在 `reports/seed42/results.md` 第 7、8 節；第 3、4 項決定不做，見第 7 節 |
-| Deployment（選做） | ⏳ 程式完成，Space 待上傳 | `src/demo.py`（`ensemble_e2`，Gradio），部署到 Hugging Face Spaces，見第 8 節 |
+| Deployment（選做） | ✅ 完成（本機） | `src/demo.py`（`ensemble_e2`，Gradio），在本機執行；Hugging Face Space 需要 PRO 訂閱，未對外部署，見第 8 節 |
 
 ---
 
@@ -113,7 +113,7 @@ nycu-data-science-project/
 │   └── smoke/{model}_{setting}/
 ├── reports/seed42/           # seed-42 主實驗的 evaluate.py 輸出與程式版本說明（納入 git）
 ├── tests/                    # 回歸測試（unittest）：checkpoint 存讀（CPU）、demo 和評估結果一致
-├── space/                    # Hugging Face Space 設定（README.md、requirements.txt），第 8 節
+├── space/                    # Hugging Face Space 設定（README.md、requirements.txt；需要 PRO，未部署），第 8 節
 ├── src/
 │   ├── common.py             # 路徑、LABELS、label mapping、clean()、metric 函式、build_augmented()、fingerprint()
 │   ├── prepare_data.py       # Phase 2
@@ -484,7 +484,7 @@ Kaggle late submission（補充）：`test_labels.csv` 只標出未計分的列�
 - **不做 per-label threshold 切換**（偏離原計畫）：demo 的對象是不熟這個題目的聽眾，切換只會增加理解的負擔。per-label threshold 的結果見 `reports/seed42/results.md` 第 8 節
 - **Checkpoint 來源**：`outputs/{run}/{run}_best_step-035900`（三個 E2 run 的 best step 都是 35900）存在就直接用；不存在時（例如在 Space 上）從本 repo 的 GitHub release `demo-models-seed42` 下載三個 tar.gz，解壓到同一位置。這三個 tar.gz 複製自隊友 fork（`a1105516/nycu-data-science-project`）的 release `inference-seed42-2026-11-09`，tar.gz 的 sha256 和原 release 相同；從本 repo release 下載解壓後的 12 個檔案也已確認和本機 checkpoint 逐 byte 相同
 - **驗證**：`tests/test_demo.py` 用 test_jigsaw 的 11 列（每個 label 的前兩個正例、兩個全負例、最長的一則；有一列同時是四個 label 的正例，去除重複後剩 11 列）比對 demo 的機率和 `outputs/ensemble_e2/preds_test_jigsaw.parquet`（atol 1e-4；實測 GPU、CPU 的最大差異都小於 1e-6）
-- **介面與部署**（偏離原計畫「不對外部署」）：demo 的目的是讓聽眾快速了解專案並實際使用，所以除了本機執行，也部署到 Hugging Face Spaces（免費 CPU：2 vCPU、16GB RAM），任何人用網址就能使用。Space 設定在 `space/`：`README.md` 的 YAML 指定 `app_file: src/demo.py`，`requirements.txt` 用 CPU 版 torch。免費 Space 閒置 48 小時會休眠，喚醒時要重新下載 checkpoint，需要等幾分鐘。上傳步驟見 README
+- **介面與部署**：Gradio，在本機執行。曾計畫另外部署到 Hugging Face Spaces，讓聽眾用網址就能使用；但 2026-11-11 建立 Space 時得到 402：Gradio 和 Docker Space 在免費的 cpu-basic 上需要 PRO 訂閱（只有靜態 Space 免費），所以決定不對外部署，維持原計畫的本機執行。Space 設定保留在 `space/`（`README.md` 的 YAML 指定 `app_file: src/demo.py`，`requirements.txt` 用 CPU 版 torch），之後如果訂閱 PRO，可以照 README 的步驟部署
 
 ```bash
 .venv/Scripts/python src/demo.py
@@ -525,7 +525,7 @@ Kaggle late submission（補充）：`test_labels.csv` 只標出未計分的列�
 
 **Deployment**
 - [x] `src/demo.py`、`tests/test_demo.py`、`space/`
-- [ ] Hugging Face Space 上線，網址記在 README
+- [ ] Hugging Face Space 上線：Gradio Space 需要 PRO 訂閱，已決定不做，`space/` 保留
 
 **重現性**
 - [x] 所有隨機性都固定為 seed 42：切分、抽樣、shuffle、訓練（多 seed 已決定不做，沒有例外）

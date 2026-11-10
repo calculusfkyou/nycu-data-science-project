@@ -28,7 +28,7 @@ NYCU 數據科學專題 · Group A · Team 5（吳傢澂、歐冠廷、吳承羲
 | Data Modeling | ✅ baseline 與 9 個 seed-42 runs 完成 | `src/baseline.py`、`src/train.py` |
 | Evaluation | ✅ 結果表與分析完成（[results](reports/seed42/results.md)、[analysis](reports/seed42/analysis.md)），結論以 Refinement 的 bootstrap CI 為準 | `src/evaluate.py` |
 | Refinement | ✅ bootstrap CI、per-label threshold（多 seed 與比例消融決定不做） | `src/evaluate.py` |
-| Deployment（選做） | ⏳ 程式完成，Hugging Face Space 待上傳 | `src/demo.py` |
+| Deployment（選做） | ✅ 本機 Gradio demo（未對外部署） | `src/demo.py` |
 
 ## 環境
 
@@ -96,7 +96,7 @@ datasets/
 ├── outputs/           # 訓練與評估產出（gitignored）
 ├── reports/seed42/    # seed-42 主實驗結果（evaluate.py 輸出）
 ├── tests/             # 回歸測試（checkpoint 存讀、demo）
-├── space/             # Hugging Face Space 設定
+├── space/             # Hugging Face Space 設定（需要 PRO，未部署）
 ├── docs/
 │   ├── plan.md        # 執行計畫
 │   └── run_guide.md   # 實驗執行指南
@@ -153,7 +153,7 @@ datasets/
 
 然後打開 http://127.0.0.1:7860 。
 
-**部署到 Hugging Face Spaces**（模型在 Hugging Face 的伺服器上跑，任何人用網址就能使用）：
+**部署到 Hugging Face Spaces（目前沒有部署）**：Gradio Space 需要 Hugging Face PRO 訂閱，免費帳號只能建靜態 Space，所以目前只在本機執行。`space/` 保留了 Space 設定，訂閱 PRO 之後可以照下面的步驟部署，模型會在 Hugging Face 的伺服器上跑，任何人用網址就能使用：
 
 1. 到 huggingface.co 註冊帳號。
 2. 登入。指令會開瀏覽器授權；不行的話，到 Settings → Access Tokens 建一個 Write 權限的 token，用 `--token` 傳入：
@@ -182,4 +182,4 @@ datasets/
 
 4. 打開 `https://huggingface.co/spaces/USER/toxic-comment-demo`，等建置和 checkpoint 下載完成，大約幾分鐘。
 
-之後 `demo.py` 或 `common.py` 有修改，重跑第 3 步的上傳指令即可。免費 Space 閒置 48 小時會休眠，報告前先打開一次。
+之後 `demo.py` 或 `common.py` 有修改，重跑第 3 步的上傳指令即可。Space 閒置一段時間會休眠，使用前先打開一次。
