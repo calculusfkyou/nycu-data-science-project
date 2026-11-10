@@ -1,0 +1,12 @@
+# Hugging Face Space for src/demo.py (docs/plan.md §8). gradio comes from sdk_version in README.md.
+# CPU-only torch: free Spaces have no GPU, and the CUDA wheel is several GB larger.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.11.0+cpu
+transformers==5.22.1
+tokenizers==0.23.3
+sentencepiece==0.2.2
+protobuf==7.36.2
+# src/common.py imports
+numpy==2.5.4
+pandas==3.0.6
+scikit-learn==1.9.1

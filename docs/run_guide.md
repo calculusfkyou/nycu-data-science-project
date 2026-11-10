@@ -215,7 +215,7 @@ tar -czf results.tar.gz --exclude=checkpoint-* outputs
 
 把 `results.tar.gz` 傳給我們，大小應該在 100MB 以內。
 
-Checkpoint 請先保留，等我們確認結果沒問題再刪。之後做 demo 會用到 DeBERTa 的 best checkpoint。
+Checkpoint 請先保留，等我們確認結果沒問題再刪。（demo 用的三個 E2 best checkpoint 已放在 release `demo-models-seed42`。）
 
 ---
 

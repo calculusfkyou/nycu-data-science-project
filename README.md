@@ -28,7 +28,7 @@ NYCU 數據科學專題 · Group A · Team 5（吳傢澂、歐冠廷、吳承羲
 | Data Modeling | ✅ baseline 與 9 個 seed-42 runs 完成 | `src/baseline.py`、`src/train.py` |
 | Evaluation | ✅ 結果表與分析完成（[results](reports/seed42/results.md)、[analysis](reports/seed42/analysis.md)），結論以 Refinement 的 bootstrap CI 為準 | `src/evaluate.py` |
 | Refinement | ✅ bootstrap CI、per-label threshold（多 seed 與比例消融決定不做） | `src/evaluate.py` |
-| Deployment（選做） | ⬜ | `src/demo.py` |
+| Deployment（選做） | ⏳ 程式完成，Hugging Face Space 待上傳 | `src/demo.py` |
 
 ## 環境
 
@@ -95,7 +95,8 @@ datasets/
 ├── data/processed/    # prepare_data.py 產出（gitignored）
 ├── outputs/           # 訓練與評估產出（gitignored）
 ├── reports/seed42/    # seed-42 主實驗結果（evaluate.py 輸出）
-├── tests/             # checkpoint 存讀的回歸測試
+├── tests/             # 回歸測試（checkpoint 存讀、demo）
+├── space/             # Hugging Face Space 設定
 ├── docs/
 │   ├── plan.md        # 執行計畫
 │   └── run_guide.md   # 實驗執行指南
@@ -106,7 +107,8 @@ datasets/
 │   ├── train.py       # BERT／RoBERTa／DeBERTa-v3（GPU）
 │   ├── ensemble.py    # 三個 Transformer 的等權重 ensemble（比較方法）
 │   ├── evaluate.py    # 讀 predictions，產出 results.md
-│   └── make_submission.py  # Kaggle late submission 檔
+│   ├── make_submission.py  # Kaggle late submission 檔
+│   └── demo.py        # Gradio demo（ensemble_e2）
 └── requirements.txt
 ```
 
@@ -133,8 +135,51 @@ datasets/
 - `evaluate.py` 讀 `outputs/*/preds_*.parquet`（含 ensemble），產出 `outputs/results.md`。
 - `make_submission.py` 把 4 個事先決定的 run 轉成 Kaggle 提交格式，寫到 `outputs/submissions/`，並檢查本機分數和 `metrics_long.csv`（即 `results.md` 的數字）一致。
 
-回歸測試（CPU，不需要資料或網路）：
+回歸測試。checkpoint 存讀的測試用 CPU，不需要資料或網路；`test_demo.py` 需要本機的三個 E2 checkpoint、`outputs/ensemble_e2` 和 `data/processed`，缺少時自動略過：
 
 ```bash
 .venv/Scripts/python -m unittest discover -s tests -v
 ```
+
+## Demo
+
+輸入一則英文留言，顯示 `ensemble_e2`（BERT、RoBERTa、DeBERTa-v3 的 E2 平均）估計的六類機率和判定結果，設計見 [docs/plan.md](docs/plan.md) 第 8 節。
+
+本機執行。`outputs/` 沒有 checkpoint 時，會先從 GitHub release 下載（約 1.5GB）：
+
+```bash
+.venv/Scripts/python src/demo.py
+```
+
+然後打開 http://127.0.0.1:7860 。
+
+**部署到 Hugging Face Spaces**（模型在 Hugging Face 的伺服器上跑，任何人用網址就能使用）：
+
+1. 到 huggingface.co 註冊帳號。
+2. 登入。指令會開瀏覽器授權；不行的話，到 Settings → Access Tokens 建一個 Write 權限的 token，用 `--token` 傳入：
+
+   ```bash
+   .venv/Scripts/hf auth login
+   ```
+
+3. 建立 Space，再依序上傳程式、成績表和 Space 設定。`USER` 換成你的帳號名稱：
+
+   ```bash
+   .venv/Scripts/hf repos create USER/toxic-comment-demo --type space --sdk gradio
+   ```
+
+   ```bash
+   .venv/Scripts/hf upload USER/toxic-comment-demo src src --repo-type space --include demo.py --include common.py
+   ```
+
+   ```bash
+   .venv/Scripts/hf upload USER/toxic-comment-demo reports/seed42/metrics_long.csv reports/seed42/metrics_long.csv --repo-type space
+   ```
+
+   ```bash
+   .venv/Scripts/hf upload USER/toxic-comment-demo space . --repo-type space
+   ```
+
+4. 打開 `https://huggingface.co/spaces/USER/toxic-comment-demo`，等建置和 checkpoint 下載完成，大約幾分鐘。
+
+之後 `demo.py` 或 `common.py` 有修改，重跑第 3 步的上傳指令即可。免費 Space 閒置 48 小時會休眠，報告前先打開一次。

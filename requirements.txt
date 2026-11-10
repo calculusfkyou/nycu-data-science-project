@@ -19,3 +19,6 @@ tokenizers==0.23.3
 sentencepiece==0.2.2
 protobuf==7.36.2
 tiktoken==0.14.0
+
+# Demo (Phase 6); the Hugging Face Space uses space/requirements.txt
+gradio==6.31.0

@@ -25,7 +25,7 @@ Group A · Team 5（吳傢澂、歐冠廷、吳承羲）
 | Data Modeling | ✅ 完成 | baseline 與 9 個 seed-42 runs；結果見 `reports/seed42/` |
 | Evaluation | ✅ 完成 | 結果表見 `reports/seed42/results.md`；第 6.4 節錯誤分析與第 6.6 節解讀見 `reports/seed42/analysis.md`（結論以 Refinement 的 bootstrap CI 為準） |
 | Refinement | ✅ 完成 | 只做第 1、2 項（bootstrap CI、per-label threshold），結果在 `reports/seed42/results.md` 第 7、8 節；第 3、4 項決定不做，見第 7 節 |
-| Deployment（選做） | ⬜ | |
+| Deployment（選做） | ⏳ 程式完成，Space 待上傳 | `src/demo.py`（`ensemble_e2`，Gradio），部署到 Hugging Face Spaces，見第 8 節 |
 
 ---
 
@@ -96,7 +96,7 @@ E1/E2 的訓練資料量是 E0 的兩倍。三組都跑 3 epochs，所以 E1/E2 
   - iterative-stratification（multi-label stratified split）
   - sentencepiece、protobuf（DeBERTa-v3 tokenizer 需要）
   - pyarrow（parquet）
-  - gradio（demo 用，選做）
+  - gradio（Phase 6 demo；Hugging Face Space 另用 `space/requirements.txt`）
 
 `requirements.txt` 中要固定版本號。
 
@@ -112,7 +112,8 @@ nycu-data-science-project/
 │   ├── {model}_{setting}/
 │   └── smoke/{model}_{setting}/
 ├── reports/seed42/           # seed-42 主實驗的 evaluate.py 輸出與程式版本說明（納入 git）
-├── tests/                    # checkpoint 存讀的回歸測試（unittest，CPU）
+├── tests/                    # 回歸測試（unittest）：checkpoint 存讀（CPU）、demo 和評估結果一致
+├── space/                    # Hugging Face Space 設定（README.md、requirements.txt），第 8 節
 ├── src/
 │   ├── common.py             # 路徑、LABELS、label mapping、clean()、metric 函式、build_augmented()、fingerprint()
 │   ├── prepare_data.py       # Phase 2
@@ -121,7 +122,7 @@ nycu-data-science-project/
 │   ├── ensemble.py           # 第 6.7 節：三個 Transformer 的等權重 ensemble（補充）
 │   ├── evaluate.py           # Phase 4：讀 predictions，產出結果表
 │   ├── make_submission.py    # 第 6.5 節：Kaggle late submission 檔（補充）
-│   └── demo.py               # Phase 6（選做）
+│   └── demo.py               # Phase 6：Gradio demo（ensemble_e2）
 ├── docs/
 │   ├── plan.md
 │   └── run_guide.md          # 給在其他電腦跑實驗的隊友
@@ -471,17 +472,22 @@ Kaggle late submission（補充）：`test_labels.csv` 只標出未計分的列�
 
 ## 8. Phase 6：Deployment（選做）
 
-**程式**：`src/demo.py --run outputs/deberta_e2`（run 依 Evaluation 的結果挑選）
+**程式**：`src/demo.py`（Gradio），模型是 `ensemble_e2`
 
-- **Input**：使用者輸入的一則英文留言
-- **處理**：使用和訓練完全相同的 `clean()`、tokenizer、max_len 256，載入選定 run 的 best checkpoint 做推論
+- **模型**：`ensemble_e2`（第 6.7 節：BERT、RoBERTa、DeBERTa-v3 三個 E2 run 的等權重平均）。原本計畫用 `deberta_e2`（單一模型中 val 最高）；ensemble 在 Evaluation 之後才加入，而它在 val 上的 Mean ROC-AUC 最高（0.9934），依「用 val 選模型」的規則改用它，不是依 test 結果挑選（補充）
+- **Input**：使用者輸入的一則英文留言。畫面另附 4 則自己撰寫的範例留言（不取自資料集），點一下直接判斷
+- **處理**：和評估完全相同：`clean()`、各模型自己的 tokenizer、truncation、max_length 256、fp32、每個 label 各自 sigmoid，三個模型的機率取平均
 - **Output**：
-  - 六個 toxicity probabilities（以長條圖呈現）
-  - 用 0.5 threshold 判定的 labels；如果有做 Refinement 第 2 項，可以切換成 per-label threshold
-- **介面**：Gradio，在本機執行，不對外部署
+  - 六類機率長條圖（固定 label 順序，y 軸 0–1）
+  - 用 0.5 threshold 判定的 labels
+  - 成績表：Jigsaw test 的 Mean ROC-AUC。TF-IDF baseline、`ensemble_e0`、`ensemble_e2` 從 `reports/seed42/metrics_long.csv` 讀取，另列 Kaggle 第一名 0.98856（第 6.5 節）
+- **不做 per-label threshold 切換**（偏離原計畫）：demo 的對象是不熟這個題目的聽眾，切換只會增加理解的負擔。per-label threshold 的結果見 `reports/seed42/results.md` 第 8 節
+- **Checkpoint 來源**：`outputs/{run}/{run}_best_step-035900`（三個 E2 run 的 best step 都是 35900）存在就直接用；不存在時（例如在 Space 上）從本 repo 的 GitHub release `demo-models-seed42` 下載三個 tar.gz，解壓到同一位置。這三個 tar.gz 複製自隊友 fork（`a1105516/nycu-data-science-project`）的 release `inference-seed42-2026-11-09`，tar.gz 的 sha256 和原 release 相同；從本 repo release 下載解壓後的 12 個檔案也已確認和本機 checkpoint 逐 byte 相同
+- **驗證**：`tests/test_demo.py` 用 test_jigsaw 的 11 列（每個 label 的前兩個正例、兩個全負例、最長的一則；有一列同時是四個 label 的正例，去除重複後剩 11 列）比對 demo 的機率和 `outputs/ensemble_e2/preds_test_jigsaw.parquet`（atol 1e-4；實測 GPU、CPU 的最大差異都小於 1e-6）
+- **介面與部署**（偏離原計畫「不對外部署」）：demo 的目的是讓聽眾快速了解專案並實際使用，所以除了本機執行，也部署到 Hugging Face Spaces（免費 CPU：2 vCPU、16GB RAM），任何人用網址就能使用。Space 設定在 `space/`：`README.md` 的 YAML 指定 `app_file: src/demo.py`，`requirements.txt` 用 CPU 版 torch。免費 Space 閒置 48 小時會休眠，喚醒時要重新下載 checkpoint，需要等幾分鐘。上傳步驟見 README
 
 ```bash
-.venv/Scripts/python src/demo.py --run outputs/deberta_e2
+.venv/Scripts/python src/demo.py
 ```
 
 ---
@@ -516,6 +522,10 @@ Kaggle late submission（補充）：`test_labels.csv` 只標出未計分的列�
 - [x] `outputs/results.md`：主表、per-label 表、Δ 表、cross-dataset 表（seed-42 版本收在 `reports/seed42/`）
 - [x] 錯誤分析紀錄（`reports/seed42/analysis.md`）
 - [x] Refinement 結果（有做的項目）：`reports/seed42/results.md` 第 7、8 節、`bootstrap_ci.csv`
+
+**Deployment**
+- [x] `src/demo.py`、`tests/test_demo.py`、`space/`
+- [ ] Hugging Face Space 上線，網址記在 README
 
 **重現性**
 - [x] 所有隨機性都固定為 seed 42：切分、抽樣、shuffle、訓練（多 seed 已決定不做，沒有例外）
