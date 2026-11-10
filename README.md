@@ -105,7 +105,8 @@ datasets/
 │   ├── baseline.py    # TF-IDF + LR（CPU）
 │   ├── train.py       # BERT／RoBERTa／DeBERTa-v3（GPU）
 │   ├── ensemble.py    # 三個 Transformer 的等權重 ensemble（比較方法）
-│   └── evaluate.py    # 讀 predictions，產出 results.md
+│   ├── evaluate.py    # 讀 predictions，產出 results.md
+│   └── make_submission.py  # Kaggle late submission 檔
 └── requirements.txt
 ```
 
@@ -130,6 +131,7 @@ datasets/
 - `train.py` 的完整參數與執行順序見 [docs/run_guide.md](docs/run_guide.md)。
 - `ensemble.py` 把三個 Transformer 同 setting 的預測等權重平均，寫到 `outputs/ensemble_{setting}/`，作為和 SOTA／比賽方法比較用的 ensemble。任何 run 重跑後，要先重跑 `ensemble.py` 再跑 `evaluate.py`。
 - `evaluate.py` 讀 `outputs/*/preds_*.parquet`（含 ensemble），產出 `outputs/results.md`。
+- `make_submission.py` 把 4 個事先決定的 run 轉成 Kaggle 提交格式，寫到 `outputs/submissions/`，並檢查本機分數和 `metrics_long.csv`（即 `results.md` 的數字）一致。
 
 回歸測試（CPU，不需要資料或網路）：
 

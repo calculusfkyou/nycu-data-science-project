@@ -120,6 +120,7 @@ nycu-data-science-project/
 │   ├── train.py              # Phase 3：--model {bert,roberta,deberta} --setting {e0,e1,e2}
 │   ├── ensemble.py           # 第 6.7 節：三個 Transformer 的等權重 ensemble（補充）
 │   ├── evaluate.py           # Phase 4：讀 predictions，產出結果表
+│   ├── make_submission.py    # 第 6.5 節：Kaggle late submission 檔（補充）
 │   └── demo.py               # Phase 6（選做）
 ├── docs/
 │   ├── plan.md
@@ -410,6 +411,8 @@ Threshold 指標的參考值（`results.md` 第 9 節，補充）：
 - Mazari et al. (2024) Table 3：各 label 與 macro 的 Precision、Recall、F1、MCC。列出 BERT-base（macro F1 59.83%）和 BERT-3_Models (W-AVG)（62.18%）；表中 macro F1 最高為 BERT-Model3 (W-AVG) 的 62.50%。原文未說明 threshold。
 - Rahman et al. (2023) Table 4：只有 accuracy，LR + TF-IDF/word 為 0.898（最高 0.907），原文未說明是 subset 還是 per-label accuracy。
 - Kaggle 只有 Mean ROC-AUC。
+
+Kaggle late submission（補充）：`test_labels.csv` 只標出未計分的列（-1），沒有標 public／private，所以 private LB 分數無法在本機計算。`src/make_submission.py` 從現有預測產生 `outputs/submissions/{run}.csv`（未計分列填 0.5，不影響分數），由使用者上傳。只提交事先決定的 4 個 run：`tfidf_lr_e0`、`deberta_e2`（val 選出的單一模型）、`ensemble_e0`、`ensemble_e2`，不依 Kaggle 分數挑選；4 個 run 的 public／private LB 分數全部回報，不用來改變任何選擇或結論。
 
 ### 6.6 解讀注意
 
