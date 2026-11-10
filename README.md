@@ -26,7 +26,7 @@ NYCU 數據科學專題 · Group A · Team 5（吳傢澂、歐冠廷、吳承羲
 | Data Understanding | ✅ | EDA，在 repo 外完成 |
 | Data Preparation | ✅ | `src/prepare_data.py` |
 | Data Modeling | ✅ baseline 與 9 個 seed-42 runs 完成 | `src/baseline.py`、`src/train.py` |
-| Evaluation | 🔄 結果表完成（[reports/seed42/](reports/seed42/)），錯誤分析與解讀待補 | `src/evaluate.py` |
+| Evaluation | ✅ 結果表與分析完成（[results](reports/seed42/results.md)、[analysis](reports/seed42/analysis.md)），結論待 Refinement 確認 | `src/evaluate.py` |
 | Refinement | ⬜ | 主實驗完成後再決定 |
 | Deployment（選做） | ⬜ | `src/demo.py` |
 

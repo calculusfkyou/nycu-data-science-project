@@ -1,6 +1,6 @@
 # seed-42 主實驗結果
 
-9 個 Transformer runs（BERT／RoBERTa／DeBERTa-v3 × E0／E1／E2），seed 42，batch 16，3 epochs，RTX 5070（bf16），加上本機 CPU 跑的 TF-IDF + LR baseline（只有 E0）。本資料夾的 `results.md`、`metrics_long.csv`、`val_curves.png` 是 `src/evaluate.py` 對這 10 個 runs 的原始輸出。
+9 個 Transformer runs（BERT／RoBERTa／DeBERTa-v3 × E0／E1／E2），seed 42，batch 16，3 epochs，RTX 5070（bf16），加上本機 CPU 跑的 TF-IDF + LR baseline（只有 E0）。本資料夾的 `results.md`、`metrics_long.csv`、`val_curves.png` 是 `src/evaluate.py` 對這 10 個 runs 的原始輸出；`analysis.md` 是依這些結果撰寫的錯誤分析與解讀（plan §6.4、§6.6）。
 
 ## 程式版本
 

@@ -23,7 +23,7 @@ Group A · Team 5（吳傢澂、歐冠廷、吳承羲）
 | Data Understanding | ✅ 完成 | EDA 與補充分析已完成，結論整理於第 3 節 |
 | Data Preparation | ✅ 完成 | `src/prepare_data.py`；產出與統計見 `data/processed/data_summary.md` |
 | Data Modeling | ✅ 完成 | baseline 與 9 個 seed-42 runs；結果見 `reports/seed42/` |
-| Evaluation | 🔄 表格完成 | `evaluate.py` 的結果表與 FP／FN 統計已產出；第 6.5 節參考列已加入主表；第 6.4 節人工閱讀錯誤樣本、第 6.6 節解讀待補 |
+| Evaluation | ✅ 完成 | 結果表見 `reports/seed42/results.md`；第 6.4 節錯誤分析與第 6.6 節解讀見 `reports/seed42/analysis.md`（結論待 Refinement 的 bootstrap CI 與多 seed 確認） |
 | Refinement | ⬜ | 等主實驗完成後決定要做哪些 |
 | Deployment（選做） | ⬜ | |
 
@@ -385,6 +385,9 @@ Smoke 輸出可以用 `--outputs outputs/smoke` 測試整個評估流程。Boots
 5. **訓練曲線圖**：每個 run 的 val Mean ROC-AUC 隨訓練進度的變化。
 
 ### 6.4 錯誤分析（以 DeBERTa 為主）
+
+結果：`reports/seed42/analysis.md` 第 2 節。
+
 - 在 0.5 threshold 下，比較 E0／E1／E2 每個 label 的 FP、FN 數量。
 - 找出 E0 → E2 預測翻轉的樣本（FN 變 TP、TN 變 FP），看翻轉集中在哪些 label。
 - threat 和 identity_hate 各抽 20 筆 E0 的 FN，人工閱讀，再看 E2 是否改善。
@@ -401,6 +404,9 @@ Smoke 輸出可以用 `--outputs outputs/smoke` 測試整個評估流程。Boots
 各論文的切分方式不同，表中數字只作為參考範圍，不能當成同一基準下的排名。`evaluate.py` 把這三列以斜體附在主表下方（只有 Mean ROC-AUC，其他欄填「—」）。
 
 ### 6.6 解讀注意
+
+結果：`reports/seed42/analysis.md` 第 1、3 節。
+
 - Jigsaw test 中 threat 只有 211 個正例、severe_toxic 只有 367 個，這兩類的 Δ 容易受少數樣本影響。
 - 主實驗每個設定只跑一個 seed。Δ 很小時，不能直接下結論，要搭配第 7 節的 bootstrap CI 或多 seed 結果。
 
@@ -469,7 +475,7 @@ Smoke 輸出可以用 `--outputs outputs/smoke` 測試整個評估流程。Boots
 
 **結果**
 - [x] `outputs/results.md`：主表、per-label 表、Δ 表、cross-dataset 表（seed-42 版本收在 `reports/seed42/`）
-- [ ] 錯誤分析紀錄
+- [x] 錯誤分析紀錄（`reports/seed42/analysis.md`）
 - [ ] Refinement 結果（有做的項目）
 
 **重現性**
