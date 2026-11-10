@@ -2,7 +2,9 @@
 
 Run: .venv/Scripts/python src/evaluate.py [--outputs outputs/smoke]
 
-Writes {outputs}/results.md, metrics_long.csv, val_curves.png and error_samples_{model}.csv.
+Writes {outputs}/results.md, metrics_long.csv, val_curves.png, error_samples_{model}.csv and bootstrap_ci.csv.
+Section 9 adds threshold-0.5 metrics (precision, recall, MCC, micro F1, Hamming loss, subset accuracy) with references.
+Refinement (plan §7 items 1-2) is included: paired bootstrap CI of Δ ROC-AUC and val-tuned per-label thresholds.
 """
 import argparse
 import json
@@ -13,8 +15,10 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from sklearn.metrics import (accuracy_score, f1_score, hamming_loss, matthews_corrcoef, precision_score,
+                             recall_score, roc_auc_score)
 
-from common import (EVAL_SPLITS, LABELS, OUTPUTS, PROCESSED, SEED, SPLIT_LABELS, compute_metrics, fingerprint,
+from common import (EVAL_SPLITS, F1_THRESHOLD, LABELS, OUTPUTS, PROCESSED, SEED, SPLIT_LABELS, compute_metrics, fingerprint,
                     load_train, md_table)
 
 MODEL_ORDER = ["tfidf_lr", "bert", "roberta", "deberta"]
@@ -23,12 +27,52 @@ DELTAS = [("e1", "e0", "E1 − E0（hard augmentation）"), ("e2", "e0", "E2 −
 FOCUS_LABELS = ["threat", "identity_hate"]  # plan §6.4: read 20 E0 false negatives each
 ERROR_MODELS = ["deberta"]
 N_SAMPLES = 20
+def _mazari(macro, per_label) -> dict:
+    """Mazari et al. (2024) Table 3 in % -> fractions keyed like metrics_long.csv.
+    macro = (P, R, F1, MCC) Macro Average; per_label = {label: (P, R, F1, MCC)}."""
+    d = dict(zip(["macro_precision", "macro_recall", "macro_f1", "macro_mcc"], np.array(macro) / 100))
+    for l, prf in per_label.items():
+        d |= dict(zip([f"precision/{l}", f"recall/{l}", f"f1/{l}", f"mcc/{l}"], np.array(prf) / 100))
+    return d
+
+
+# plan §6.5: references that report threshold-based metrics, keyed like metrics_long.csv columns. A missing key is
+# shown as "—"; a string is shown verbatim.
+THRESHOLD_REFERENCES = [
+    ("Mazari BERT-base", _mazari((49.63, 77.65, 59.83, 60.62), {
+        "toxic": (47.97, 92.82, 63.25, 65.52), "severe_toxic": (32.78, 65.12, 43.61, 43.79),
+        "obscene": (61.62, 82.23, 70.45, 67.89), "threat": (56.36, 58.77, 57.54, 55.62),
+        "insult": (53.24, 83.37, 64.98, 67.78), "identity_hate": (45.77, 83.57, 59.15, 63.12)})),
+    ("Mazari BERT-3_Models (W-AVG)", _mazari((58.50, 67.78, 62.18, 61.64), {
+        "toxic": (56.86, 89.43, 69.52, 67.03), "severe_toxic": (41.23, 40.33, 40.77, 44.15),
+        "obscene": (60.50, 80.76, 69.18, 69.04), "threat": (57.40, 60.66, 58.99, 57.44),
+        "insult": (67.04, 76.51, 71.46, 68.48), "identity_hate": (67.96, 58.99, 63.16, 63.68)})),
+    ("Rahman LR + TF-IDF/word", {"subset_accuracy": "0.898（accuracy，定義不明）"}),
+]
+N_BOOT = 1000  # plan §7 item 1: paired bootstrap resamples of Jigsaw test
+THRESHOLD_GRID = np.round(np.arange(0.05, 0.951, 0.01), 2)  # plan §7 item 2
 # Mean ROC-AUC values as listed in plan §6.5. Different setups, so a range, not a ranking.
 REFERENCES = [
     ("Rahman et al. (2023)", "baseline 參考：傳統 ML", "0.973"),
     ("Mazari et al. (2024)", "SOTA 參考：BERT + Bi-LSTM/Bi-GRU ensemble", "0.9863"),
     ("Kaggle 第一名", "private leaderboard，4,539 隊", "0.98856"),
 ]
+
+
+def threshold_metrics(y, hit, labels) -> dict:
+    """Plan §6.1 supplementary metrics at threshold 0.5 (y, hit: boolean n × labels), mostly for §6.5 comparisons.
+    Macro values are plain means over labels, matching Mazari et al. Table 3's macro average."""
+    out = {}
+    for i, l in enumerate(labels):
+        out[f"precision/{l}"] = precision_score(y[:, i], hit[:, i], zero_division=0)
+        out[f"recall/{l}"] = recall_score(y[:, i], hit[:, i], zero_division=0)
+        out[f"mcc/{l}"] = matthews_corrcoef(y[:, i], hit[:, i])
+    for name in ["precision", "recall", "mcc"]:
+        out[f"macro_{name}"] = float(np.mean([out[f"{name}/{l}"] for l in labels]))
+    out["micro_f1"] = f1_score(y, hit, average="micro", zero_division=0)
+    out["hamming_loss"] = hamming_loss(y, hit)
+    out["subset_accuracy"] = accuracy_score(y, hit)  # exact match of all labels
+    return out
 
 
 def load_runs(outdir: Path, truth: dict) -> pd.DataFrame:
@@ -55,6 +99,8 @@ def load_runs(outdir: Path, truth: dict) -> pd.DataFrame:
                 assert np.array_equal(np.sort(preds["row"]), np.arange(len(truth[s]))), f"{run_dir.name}: {s} rows"
             labels = SPLIT_LABELS[s]
             m = compute_metrics(truth[s][labels].iloc[preds["row"]], preds[labels], labels)
+            m |= threshold_metrics(truth[s][labels].iloc[preds["row"]].to_numpy() >= 0.5,
+                                   preds[labels].to_numpy() >= F1_THRESHOLD, labels)
             if not cfg["smoke"]:  # a NaN would silently turn the mean into a mean over fewer labels
                 assert not any(np.isnan(v) for v in m.values()), f"{run_dir.name}: NaN metric on {s}"
             rows.append({"run": cfg["run"], "model": cfg["model"], "setting": cfg["setting"],
@@ -82,7 +128,8 @@ def tables(metrics) -> list[str]:
                    + [[f"*{name}*", desc, "—", "—", auc, "—", "—"] for name, desc, auc in REFERENCES])
     md += ["斜體列是參考值（plan §6.5），評估設定和本專案不同，只作為範圍參考，不是同一基準下的排名："
            "Rahman 用自己的切分；Mazari 在官方 labeled test（63,977 列）上評估，但 ensemble 權重依 test 表現設定；"
-           "Kaggle private leaderboard 用的是官方 test 中的 private 部分，本表的 test 是全部已標註的列。", ""]
+           "Kaggle private leaderboard 用的是官方 test 中的 private 部分，本表的 test 是全部已標註的列。"
+           "Precision、Recall、MCC、Micro F1、Hamming loss、accuracy 和文獻的比較見第 9 節。", ""]
 
     md += ["## 2. Per-label：Jigsaw official labeled test", ""]
     for key, name in [("roc_auc", "ROC-AUC"), ("pr_auc", "PR-AUC")]:
@@ -181,6 +228,140 @@ def error_analysis(outdir: Path, metrics, test: pd.DataFrame) -> list[str]:
     return md
 
 
+def read_preds(outdir: Path, run: str, split: str) -> pd.DataFrame:
+    return pd.read_parquet(outdir / run / f"preds_{split}.parquet").set_index("row").sort_index()
+
+
+def auc_parts(y, s):
+    """Precompute each row's tie group (groups ordered by score) once, so each bootstrap ROC-AUC is O(n)."""
+    _, group = np.unique(s, return_inverse=True)
+    return group, y
+
+
+def weighted_auc(parts, w):
+    """ROC-AUC with row weights w (bootstrap counts): P(score_pos > score_neg) + 0.5 * P(tie)."""
+    group, y = parts
+    neg, pos = np.bincount(group, w * ~y), np.bincount(group, w * y)
+    below = np.cumsum(neg) - neg  # negative weight strictly below each tie group
+    with np.errstate(invalid="ignore"):  # NaN if a resample has one class (only on tiny smoke subsets)
+        return (pos * (below + 0.5 * neg)).sum() / (pos.sum() * neg.sum())
+
+
+def bootstrap_ci(outdir: Path, metrics, test: pd.DataFrame) -> tuple[list[str], pd.DataFrame]:
+    """Plan §7 item 1: paired bootstrap 95% CI of Δ ROC-AUC on Jigsaw test (same resampled rows for both settings)."""
+    md, rows_out = [], []
+    main = main_runs(metrics[metrics["split"] == "test_jigsaw"])
+    for model in [m for m in MODEL_ORDER if m in set(main["model"])]:
+        runs = main[main["model"] == model].set_index("setting")["run"]
+        pairs = [(a, b, title) for a, b, title in DELTAS if {a, b} <= set(runs.index)]
+        if not pairs:
+            continue
+        preds = {s: read_preds(outdir, run, "test_jigsaw") for s, run in runs.items()}
+        rows = next(iter(preds.values())).index.to_numpy()
+        assert all(np.array_equal(p.index, rows) for p in preds.values()), f"{model}: settings cover different rows"
+        y = test.iloc[rows][LABELS].to_numpy() >= 0.5
+        parts = {(s, i): auc_parts(y[:, i], p[LABELS].to_numpy()[:, i]) for s, p in preds.items()
+                 for i in range(len(LABELS))}
+        ones = np.ones(len(rows))
+        full = {k: weighted_auc(v, ones) for k, v in parts.items()}
+        for (s, i), auc in full.items():  # self-check against sklearn on the unresampled data
+            assert abs(auc - roc_auc_score(y[:, i], preds[s][LABELS[i]])) < 1e-9, (model, s, LABELS[i])
+        rng = np.random.default_rng(SEED)  # same resamples for every model
+        boot = {k: np.empty(N_BOOT) for k in parts}
+        for b in range(N_BOOT):
+            w = np.bincount(rng.integers(0, len(rows), len(rows)), minlength=len(rows))
+            for k, v in parts.items():
+                boot[k][b] = weighted_auc(v, w)
+        cells = []
+        for a, b, title in pairs:
+            per_label = [(boot[(a, i)] - boot[(b, i)], full[(a, i)] - full[(b, i)]) for i in range(len(LABELS))]
+            mean = (np.mean([d for d, _ in per_label], axis=0), np.mean([f for _, f in per_label]))
+            row_cells = [title]
+            for name, (dist, point) in zip(["Mean", *LABELS], [mean, *per_label]):
+                lo, hi = np.nanpercentile(dist, [2.5, 97.5])
+                excl = lo > 0 or hi < 0
+                rows_out.append({"model": model, "delta": f"{a}-{b}", "label": name, "point": point,
+                                 "ci_low": lo, "ci_high": hi, "excludes_zero": excl})
+                row_cells.append(f"{point:+.4f} [{lo:+.4f}, {hi:+.4f}]{' *' if excl else ''}")
+            cells.append(row_cells)
+        md += [f"**{model}**", ""] + md_table(["Δ ROC-AUC", "Mean", *LABELS], cells)
+    if md:
+        md = [f"## 7. Bootstrap 95% CI：Δ ROC-AUC（Jigsaw test，paired，{N_BOOT:,} 次，seed {SEED}）", "",
+              "格式：點估計 [2.5%, 97.5%]；`*` 表示 CI 不含 0。只反映測試資料的抽樣誤差，不含訓練隨機性（單一 seed）。",
+              ""] + md
+    return md, pd.DataFrame(rows_out)
+
+
+def f1_grid(prob, y):
+    """F1 at every THRESHOLD_GRID value (columns) for one label."""
+    hit = prob[:, None] >= THRESHOLD_GRID
+    tp = (hit & y[:, None]).sum(0)
+    return 2 * tp / np.maximum(2 * tp + (hit & ~y[:, None]).sum(0) + (~hit & y[:, None]).sum(0), 1)
+
+
+def tuned_thresholds(outdir: Path, metrics, truth: dict) -> list[str]:
+    """Plan §7 item 2: per label, pick the F1-best threshold on val (lowest one on ties), apply it to Jigsaw test.
+    Reported separately; the 0.5 results stay the main ones."""
+    rows_f1, rows_t = [], []
+    test = main_runs(metrics[metrics["split"] == "test_jigsaw"])
+    at_half = int(np.flatnonzero(THRESHOLD_GRID == F1_THRESHOLD)[0])
+    for _, r in test.iterrows():
+        val_p, test_p = read_preds(outdir, r["run"], "val"), read_preds(outdir, r["run"], "test_jigsaw")
+        y_val = truth["val"].iloc[val_p.index][LABELS].to_numpy() >= 0.5
+        y_test = truth["test_jigsaw"].iloc[test_p.index][LABELS].to_numpy() >= 0.5
+        cells, f1s = [], []
+        for i, l in enumerate(LABELS):
+            test_f1 = f1_grid(test_p[l].to_numpy(), y_test[:, i])
+            assert abs(test_f1[at_half] - r[f"f1/{l}"]) < 1e-9, (r["run"], l)  # same F1 as compute_metrics at 0.5
+            k = int(np.argmax(f1_grid(val_p[l].to_numpy(), y_val[:, i])))
+            f1s.append(test_f1[k])
+            cells.append(f"{THRESHOLD_GRID[k]:.2f} / {test_f1[k]:.4f}")
+        tuned = float(np.mean(f1s))
+        rows_f1.append([r["run"], fmt(r["macro_f1"]), fmt(tuned), fmt(tuned - r["macro_f1"], True)])
+        rows_t.append([r["run"], *cells])
+    md = ["## 8. Per-label threshold（val 上選 F1 最高的 threshold，套用到 Jigsaw test）", "",
+          f"搜尋 {THRESHOLD_GRID[0]:.2f}–{THRESHOLD_GRID[-1]:.2f}（step 0.01），val 上 F1 並列最高時取最小的 threshold。"
+          "另外報告，不取代 threshold 0.5 的主結果。", ""]
+    md += md_table(["Run", "Macro F1（0.5）", "Macro F1（val 選）", "Δ"], rows_f1)
+    md += ["**各 label：threshold / test F1**", ""] + md_table(["Run", *LABELS], rows_t)
+    return md
+
+
+def threshold_table(metrics, test: pd.DataFrame) -> list[str]:
+    """Plan §6.1 supplementary metrics at threshold 0.5 on Jigsaw test, with §6.5 references that report them."""
+    runs = main_runs(metrics[metrics["split"] == "test_jigsaw"])
+    cols = ["macro_precision", "macro_recall", "macro_f1", "micro_f1", "macro_mcc", "hamming_loss", "subset_accuracy"]
+    y = test[LABELS].to_numpy() >= 0.5
+    zero = threshold_metrics(y, np.zeros_like(y), LABELS) | {"macro_f1": 0.0}
+    md = ["## 9. Threshold 0.5 指標與文獻比較（Jigsaw test）", ""]
+    md += md_table(["Run", "Macro P", "Macro R", "Macro F1", "Micro F1", "Macro MCC", "Hamming loss",
+                    "Subset accuracy"],
+                   [[r["run"], *(fmt(r[c]) for c in cols)] for _, r in runs.iterrows()]
+                   + [["*全部預測為 0*", *(fmt(zero[c]) for c in cols)]]
+                   + [[f"*{name}*", *(ref_cell(ref.get(c)) for c in cols)] for name, ref in THRESHOLD_REFERENCES])
+    md += ["Macro 是六個 label 的平均。斜體列是參考：「全部預測為 0」由 test 標籤直接算出；Mazari et al. (2024) 的數字"
+           "取自 Table 3（官方 test，原文未說明 threshold，max length 128）；Rahman et al. (2023) 只報告 accuracy"
+           "（Table 4，LR + TF-IDF/word；原文未說明是 subset 還是 per-label accuracy，最高為 SGD + Hashing/word 的 0.907），"
+           "而本表 test 有約九成留言六個 label 全為 0，accuracy 幾乎無法區分模型好壞。", ""]
+    md += ["**各 label：Precision / Recall / F1**", ""]
+    md += md_table(["Run", *LABELS],
+                   [[r["run"], *(f"{r[f'precision/{l}']:.4f} / {r[f'recall/{l}']:.4f} / {r[f'f1/{l}']:.4f}"
+                                 for l in LABELS)] for _, r in runs.iterrows()]
+                   + [[f"*{name}*", *(f"{ref[f'precision/{l}']:.4f} / {ref[f'recall/{l}']:.4f} / {ref[f'f1/{l}']:.4f}"
+                                      for l in LABELS)]
+                      for name, ref in THRESHOLD_REFERENCES if f"f1/{LABELS[0]}" in ref])
+    md += ["**各 label：MCC**", ""]
+    md += md_table(["Run", *LABELS, "Macro"],
+                   [[r["run"], *(fmt(r[f"mcc/{l}"]) for l in LABELS), fmt(r["macro_mcc"])] for _, r in runs.iterrows()]
+                   + [[f"*{name}*", *(fmt(ref[f"mcc/{l}"]) for l in LABELS), fmt(ref["macro_mcc"])]
+                      for name, ref in THRESHOLD_REFERENCES if f"mcc/{LABELS[0]}" in ref])
+    return md
+
+
+def ref_cell(v) -> str:
+    return "—" if v is None else v if isinstance(v, str) else fmt(v)
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--outputs", type=Path, default=OUTPUTS, help="folder holding one sub-folder per run")
@@ -196,6 +377,12 @@ def main():
     md += error_analysis(outdir, metrics, truth["test_jigsaw"])
     if val_curves(outdir, outdir / "val_curves.png"):
         md += ["## 6. 訓練曲線", "", "![val curves](val_curves.png)", ""]
+    ci_md, ci = bootstrap_ci(outdir, metrics, truth["test_jigsaw"])
+    md += ci_md
+    if len(ci):
+        ci.to_csv(outdir / "bootstrap_ci.csv", index=False)
+    md += tuned_thresholds(outdir, metrics, truth)
+    md += threshold_table(metrics, truth["test_jigsaw"])
     (outdir / "results.md").write_text("\n".join(md), encoding="utf-8")
     print(f"Evaluated {metrics['run'].nunique()} runs. Wrote {outdir / 'results.md'}")
 

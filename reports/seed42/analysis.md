@@ -5,8 +5,10 @@
 - release 內的 `error_samples_deberta.csv`（含原始留言）
 - `data/processed/data_summary.md`（各訓練集的正例數）
 - `docs/plan.md` §6.5（文獻與 Kaggle 參考值）
+- `results.md` 第 7、8 節與 `bootstrap_ci.csv`（Refinement：bootstrap CI、per-label threshold）
+- `results.md` 第 9 節（threshold 0.5 指標與文獻比較）
 
-**所有結論都是暫定的。** 每個設定只有一個 seed，E0／E1／E2 之間的 |Δ Mean ROC-AUC| 都 < 0.002，依 plan §7 要先做 bootstrap CI（Refinement 第 1 項）並觸發 DeBERTa 多 seed（第 3 項），才能判斷差異是否可靠。
+**結論的適用範圍。** 每個設定只有一個 seed（42），E0／E1／E2 之間的 |Δ Mean ROC-AUC| 都 < 0.002。Bootstrap 95% CI（第 1.7 節）只反映測試資料的抽樣誤差；多 seed 決定不做（plan §7），所以「CI 不含 0」只代表在 seed 42 下差異超出測試抽樣誤差，不能推論到其他 seed。
 
 ---
 
@@ -15,18 +17,22 @@
 ### 1.1 Transformer 與 baseline
 - 三個 Transformer 的 Mean ROC-AUC（0.9843–0.9864）都高於 TF-IDF + LR baseline（0.9801），差距 +0.004～+0.006；Mean PR-AUC 差距 +0.01～+0.07。
 - Baseline 0.9801 高於 Rahman et al. (2023) 的 0.973。最好的 run（BERT E2，0.9864）和 Mazari et al. (2024) 的 0.9863 相當，但 Mazari 依 test 表現設定 ensemble 權重，不是同一基準；比 Kaggle 第一名（private LB 0.98856，大型 ensemble）低約 0.002。
+- **Threshold 0.5 指標**（`results.md` 第 9 節；Mazari 未說明 threshold，僅供參考）：
+  - BERT E0 和 Mazari 的 BERT-base 同為 bert-base-uncased、lr 2e-5、3 epochs（max length 256 vs 128、batch 16 vs 32），結果相近：macro P／R／F1 為 0.480／0.776／0.585，對 0.496／0.777／0.598。
+  - BERT E2 的 macro F1 0.626、macro MCC 0.624，略高於 Mazari 最佳 AUC 的 ensemble（0.622、0.616）。
+  - Subset accuracy：所有模型（0.851–0.893）都低於「全部預測為 0」的 0.902，Rahman 的 accuracy 0.898 也落在這附近，所以 accuracy 不適合比較模型。Hamming loss 也一樣由負例主導：BERT E0 的 0.0376 幾乎等於「全部預測為 0」的 0.0378。Hamming loss 最低的是 TF-IDF baseline（0.025），因為它在 0.5 下預測的正例最少（13,990 筆，Transformer 為 21,405–25,531 筆；test 實際正例 14,498 筆）。
 
 ### 1.2 RQ1：加入 Civil 外部資料有沒有幫助
 - **ROC-AUC**：三個模型都是 E1、E2 ≥ E0，但 Mean 的增幅只有 +0.0005～+0.0019，都低於 0.002。
 - **RoBERTa、DeBERTa 的增益集中在 threat**：E2 − E0 的 threat ROC-AUC 為 +0.0072、+0.0087，是這兩個模型各 label 中最大的。BERT 各 label 的 Δ 都 ≤ 0.003，threat 只有 +0.0010（E1 − E0 為 +0.0000）。外部資料讓 threat 正例從 430（E0）增加到 755（E1 hard）或 soft mass 1,809（E2）。
 - **PR-AUC 不一致**：E1 讓 RoBERTa（−0.032）和 DeBERTa（−0.010）的 Mean PR-AUC 下降，BERT 上升（+0.016）；E2 則三個模型都上升（+0.008～+0.033）。
-- 小結：外部資料對排序能力（ROC-AUC）有小幅、方向一致的正面效果；以 hard label 加入時，precision–recall 的表現不穩定。
+- 小結：外部資料對排序能力（ROC-AUC）有小幅、方向一致的正面效果；以 hard label 加入時，precision–recall 的表現不穩定。依 bootstrap CI，E2 − E0 的 Mean 在三個模型都不含 0，E1 − E0 只有 BERT 不含 0（第 1.7 節）。
 
 ### 1.3 RQ2：hard label 與 soft label
 - 在 Mean 指標上 E2 ≥ E1：E2 − E1 的 Mean ROC-AUC 三個模型都 ≥ 0（+0.0001／+0.0007／+0.0013），Mean PR-AUC 都 > 0（+0.017～+0.042）。
 - 差異最大的是 threat 的 PR-AUC（E2 − E1：+0.047／+0.136／+0.118）。一個可能的解釋（推測，未驗證）是 soft label 保留了 score 介於 0 和 0.5 之間的留言，hard label 會把它們都變成 0：threat 的 soft mass 1,809 是 hard 正例 755 的 2.4 倍。
 - per-label 有例外，例如 E2 − E1 的 PR-AUC：DeBERTa severe_toxic −0.060、BERT toxic −0.017、RoBERTa toxic −0.016；ROC-AUC：BERT toxic −0.0021、RoBERTa toxic −0.0011、DeBERTa severe_toxic −0.0008。Civil test 的 Macro F1 也是 E1 較高（見 1.5）。
-- 小結：在相同外部樣本下，soft label 的 Mean 指標一致地優於或等於 hard label，但差距很小，且不是每個 label 都成立。
+- 小結：在相同外部樣本下，soft label 的 Mean 指標一致地優於或等於 hard label，但差距很小，且不是每個 label 都成立。依 bootstrap CI，E2 − E1 的 Mean 在 RoBERTa、DeBERTa 不含 0，BERT 含 0（第 1.7 節）。
 
 ### 1.4 模型比較
 - DeBERTa-v3 沒有明顯勝出：Jigsaw test 上 BERT E2 0.9864、DeBERTa E2 0.9862、RoBERTa E2 0.9861，差距 < 0.0005。
@@ -41,7 +47,30 @@
 - 加入外部資料會改變各 label 輸出機率的分布。以 DeBERTa 為例，E0 → E2 在 threshold 0.5 下：
   - FP 增加：threat 207 → 326、severe_toxic 283 → 625、insult 1,657 → 2,306
   - FP 減少：toxic 5,628 → 4,934、obscene 2,552 → 2,093
-- 因此 threshold 0.5 的 Macro F1 在不同 setting 之間不能直接比較，排序能力要看 ROC-AUC／PR-AUC。per-label threshold（Refinement 第 2 項）可以把校準差異和排序能力分開。
+- 因此 threshold 0.5 的 Macro F1 在不同 setting 之間不能直接比較，排序能力要看 ROC-AUC／PR-AUC。per-label threshold 的結果見第 1.7 節。
+
+### 1.7 Refinement：bootstrap CI 與 per-label threshold
+數字見 `results.md` 第 7、8 節。
+
+**Bootstrap 95% CI（Δ ROC-AUC，paired，1,000 次）**
+
+| Mean Δ ROC-AUC | BERT | RoBERTa | DeBERTa |
+|---|---|---|---|
+| E1 − E0 | +0.0007 [+0.0002, +0.0011] * | +0.0011 [−0.0000, +0.0029] | +0.0005 [−0.0003, +0.0015] |
+| E2 − E0 | +0.0008 [+0.0004, +0.0012] * | +0.0019 [+0.0008, +0.0035] * | +0.0018 [+0.0007, +0.0035] * |
+| E2 − E1 | +0.0001 [−0.0002, +0.0004] | +0.0007 [+0.0003, +0.0012] * | +0.0013 [+0.0006, +0.0023] * |
+
+`*` 表示 CI 不含 0。
+- **E2（soft）相對 E0 的增益最穩定**：三個模型的 Mean 都不含 0。E1（hard）相對 E0 只有 BERT 不含 0。
+- **soft 優於 hard（Mean，RoBERTa、DeBERTa，seed 42）**：RoBERTa、DeBERTa 的 E2 − E1 不含 0，BERT 含 0；per-label 的反向差異見下一點。
+- **threat**：E2 − E0 三個模型都不含 0，但區間很寬（DeBERTa +0.0087 [+0.0019, +0.0181]），反映 test 只有 211 個正例。
+- **反向的差異也有**：BERT、RoBERTa 的 toxic E2 − E1 為負且不含 0；DeBERTa 的 insult E1 − E0、severe_toxic E2 − E1 也是。外部資料不是對每個 label 都有幫助。
+- 63 個 per-label／Mean 的 CI 中有 33 個不含 0。每個 CI 是單獨計算的，沒有做多重比較校正，個別 label 的結果要保守看待。
+
+**Per-label threshold（val 上選 F1 最高的 threshold）**
+- Transformer 的 threshold 大多落在 0.4–0.7，Macro F1 的變化只有 −0.004～+0.019；baseline +0.0215。所以 threshold 0.5 對 Transformer 大致合適。
+- DeBERTa E2 的增益最大（0.5942 → 0.6135），E0、E1 只有 +0.005、+0.008。調整後 DeBERTa 三個 setting 的 Macro F1 為 0.6015／0.6012／0.6135，E2 在 threshold 0.5 下 F1 偏低的情況（第 1.6 節）有一部分來自 threshold。
+- 調整後的 Macro F1 最高仍是 BERT E2（0.6236）。
 
 ---
 
@@ -98,5 +127,4 @@ E2 讓 15 筆的機率上升、5 筆下降，只有 6 筆跨過 0.5；機率中�
 前面已提到單一 seed、Civil test 對 E1／E2 是同分布資料、Macro F1 依賴 threshold；另外：
 - **rare label**：test 中 threat 只有 211 個正例、severe_toxic 367 個、identity_hate 712 個，per-label Δ 容易受少數樣本影響。
 - **人工閱讀樣本少**：每類 20 筆、單一閱讀者，只能說明錯誤類型，不能估計各類型的比例。
-
-下一步見 plan §7 第 1–3 項（bootstrap CI、per-label threshold、DeBERTa 多 seed）。
+- **更多資料 vs. 更多 steps**：E1／E2 的訓練資料和 optimizer steps 都是 E0 的兩倍（plan §1.5），比例消融決定不做，增益無法歸因於其中之一。

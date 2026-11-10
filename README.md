@@ -26,8 +26,8 @@ NYCU 數據科學專題 · Group A · Team 5（吳傢澂、歐冠廷、吳承羲
 | Data Understanding | ✅ | EDA，在 repo 外完成 |
 | Data Preparation | ✅ | `src/prepare_data.py` |
 | Data Modeling | ✅ baseline 與 9 個 seed-42 runs 完成 | `src/baseline.py`、`src/train.py` |
-| Evaluation | ✅ 結果表與分析完成（[results](reports/seed42/results.md)、[analysis](reports/seed42/analysis.md)），結論待 Refinement 確認 | `src/evaluate.py` |
-| Refinement | ⬜ | 主實驗完成後再決定 |
+| Evaluation | ✅ 結果表與分析完成（[results](reports/seed42/results.md)、[analysis](reports/seed42/analysis.md)），結論以 Refinement 的 bootstrap CI 為準 | `src/evaluate.py` |
+| Refinement | ✅ bootstrap CI、per-label threshold（多 seed 與比例消融決定不做） | `src/evaluate.py` |
 | Deployment（選做） | ⬜ | `src/demo.py` |
 
 ## 環境
@@ -79,7 +79,7 @@ datasets/
 | `val.parquet` | Jigsaw 的 10% validation（multi-label stratified，seed 42） |
 | `test_jigsaw.parquet` | Jigsaw official labeled test（63,978 筆） |
 | `test_civil.parquet` | Civil test，以 ≥ 0.5 二值化，只含五類，用於 cross-dataset 評估 |
-| `civil_pool_perm.parquet` | 打亂後的 augmentation pool，給 Refinement 的比例消融使用 |
+| `civil_pool_perm.parquet` | 打亂後的 augmentation pool，原本給 Refinement 的比例消融使用（已決定不做，檔案保留） |
 | `data_summary.md` | 筆數、overlap、各 label 正例數，以及驗收結果 |
 
 處理規則：

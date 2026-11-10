@@ -23,8 +23,8 @@ Group A · Team 5（吳傢澂、歐冠廷、吳承羲）
 | Data Understanding | ✅ 完成 | EDA 與補充分析已完成，結論整理於第 3 節 |
 | Data Preparation | ✅ 完成 | `src/prepare_data.py`；產出與統計見 `data/processed/data_summary.md` |
 | Data Modeling | ✅ 完成 | baseline 與 9 個 seed-42 runs；結果見 `reports/seed42/` |
-| Evaluation | ✅ 完成 | 結果表見 `reports/seed42/results.md`；第 6.4 節錯誤分析與第 6.6 節解讀見 `reports/seed42/analysis.md`（結論待 Refinement 的 bootstrap CI 與多 seed 確認） |
-| Refinement | ⬜ | 等主實驗完成後決定要做哪些 |
+| Evaluation | ✅ 完成 | 結果表見 `reports/seed42/results.md`；第 6.4 節錯誤分析與第 6.6 節解讀見 `reports/seed42/analysis.md`（結論以 Refinement 的 bootstrap CI 為準） |
+| Refinement | ✅ 完成 | 只做第 1、2 項（bootstrap CI、per-label threshold），結果在 `reports/seed42/results.md` 第 7、8 節；第 3、4 項決定不做，見第 7 節 |
 | Deployment（選做） | ⬜ | |
 
 ---
@@ -69,7 +69,7 @@ E1 和 E2 使用**同一批** Civil 樣本，兩者唯一的差別是標籤處�
 | 最終評估資料 | Jigsaw official labeled test，不參與訓練和 checkpoint 選擇 |
 
 ### 1.5 已知限制
-E1/E2 的訓練資料量是 E0 的兩倍。三組都跑 3 epochs，所以 E1/E2 的 optimizer steps 也是兩倍。如果觀察到增益，無法完全區分是來自「更多資料」還是「更多 steps」。報告中要寫明這一點。Refinement 的比例消融（第 7 節）可以提供部分佐證。
+E1/E2 的訓練資料量是 E0 的兩倍。三組都跑 3 epochs，所以 E1/E2 的 optimizer steps 也是兩倍。如果觀察到增益，無法完全區分是來自「更多資料」還是「更多 steps」。報告中要寫明這一點。Refinement 的比例消融（第 7 節）原本可以提供部分佐證，但決定不做，所以這一點只能列為限制。
 
 ---
 
@@ -201,7 +201,7 @@ nycu-data-science-project/
 
 - 抽樣數 `n = len(jigsaw_train_split)`，即 1:1。
 - 用 seed 42 對 pool 做一次 permutation，取前 n 筆。
-  - 這樣 Refinement 的比例消融（0.5:1、2:1）只要取前 0.5n／2n 筆，樣本之間就是巢狀關係（0.5:1 ⊂ 1:1 ⊂ 2:1）。
+  - 這樣 Refinement 的比例消融（0.5:1、2:1）只要取前 0.5n／2n 筆，樣本之間就是巢狀關係（0.5:1 ⊂ 1:1 ⊂ 2:1）。比例消融已決定不做（第 7 節），檔案保留。
 - E1：`(score >= 0.5).astype(float32)`。門檻沿用 Jigsaw Unintended Bias 競賽的判定方式。
 - E2：`score.astype(float32)`。
 - 外部樣本和 Jigsaw train split 合併後，用 seed 42 shuffle。E1、E2 用同一個 shuffle 順序。
@@ -225,7 +225,7 @@ nycu-data-science-project/
 | `data/processed/val.parquet` | Jigsaw val split | `text`、六個 labels |
 | `data/processed/test_jigsaw.parquet` | Jigsaw official labeled test | `id`、`text`、六個 labels |
 | `data/processed/test_civil.parquet` | Civil test（二值化） | `text`、五個 labels |
-| `data/processed/civil_pool_perm.parquet` | permutation 後的完整 pool（保留原始 score） | 給比例消融使用 |
+| `data/processed/civil_pool_perm.parquet` | permutation 後的完整 pool（保留原始 score） | 給比例消融使用（已決定不做，檔案保留） |
 | `data/processed/data_summary.md` | 統計摘要 | 見下方 |
 
 `source` 欄位的值為 `jigsaw` 或 `civil`，用於事後分析。
@@ -262,7 +262,7 @@ nycu-data-science-project/
 ### 5.2 Transformer models
 **程式**：`src/train.py --model {bert,roberta,deberta} --setting {e0,e1,e2} [--smoke] [--batch-size N] [--resume] [--seed N] [--ratio R]`
 
-- `--seed` 和 `--ratio` 是 Refinement 第 3、4 項用的參數，現在先實作，之後不必再改程式（補充）。
+- `--seed` 和 `--ratio` 是 Refinement 第 3、4 項用的參數，現在先實作，之後不必再改程式（補充）。第 3、4 項已決定不做（第 7 節），參數保留以便日後使用。
   - `--seed` 只換訓練 seed，資料切分和外部樣本維持 seed 42。
   - `--ratio` 從 `civil_pool_perm.parquet` 取前 ratio × n 筆，用和 `prepare_data.py` 相同的 `common.build_augmented()` 組成 E1／E2。ratio 1 就是 `train_e1`／`train_e2`。
   - 輸出資料夾名稱加上後綴，例如 `deberta_e2_r0.5`、`deberta_e0_s43`。
@@ -354,7 +354,7 @@ nycu-data-science-project/
 - `outputs/val_curves.png`：訓練曲線
 - `outputs/error_samples_deberta.csv`：E0 的 threat、identity_hate false negatives 各 20 筆，附 E0／E2 機率，供人工閱讀
 
-Smoke 輸出可以用 `--outputs outputs/smoke` 測試整個評估流程。Bootstrap CI 和 per-label threshold 屬於 Refinement，等 decision gate 後再加。
+Smoke 輸出可以用 `--outputs outputs/smoke` 測試整個評估流程。Bootstrap CI 和 per-label threshold 屬於 Refinement，也由 `evaluate.py` 產生（`results.md` 第 7、8 節、`bootstrap_ci.csv`）。
 
 ### 6.1 指標
 
@@ -364,12 +364,13 @@ Smoke 輸出可以用 `--outputs outputs/smoke` 測試整個評估流程。Boots
 | Per-label ROC-AUC | 每個 label 的 ROC-AUC | 看各類別的表現 |
 | Per-label PR-AUC | `average_precision_score`，另外列出六類平均 | 在 imbalance 下比 ROC-AUC 更敏感 |
 | Macro F1 | 機率以 0.5 為 threshold 後，`f1_score(average="macro", zero_division=0)` | 看實際分類效果 |
+| 補充：Precision、Recall、MCC（各 label 與 macro）、Micro F1、Hamming loss、Subset accuracy | 同樣以 0.5 為 threshold；macro 為六個 label 的平均，subset accuracy 是六個 label 全對的比例 | 和報告這些指標的文獻比較（第 6.5 節）；accuracy 在本資料幾乎無鑑別力（全部預測為 0 即有 0.902）（補充） |
 
 ### 6.2 評估資料與用途
 
 | 資料 | 用途 |
 |---|---|
-| Jigsaw val | 只用於 checkpoint 選擇與 baseline 調參 |
+| Jigsaw val | 只用於 checkpoint 選擇、baseline 調參，以及 Refinement 的 per-label threshold 選擇 |
 | Jigsaw official labeled test | **E0／E1／E2 的最終比較**，以及和文獻、Kaggle 的 benchmark |
 | Civil test（五類） | Cross-dataset 表現 |
 
@@ -383,6 +384,7 @@ Smoke 輸出可以用 `--outputs outputs/smoke` 測試整個評估流程。Boots
    - 每個 Δ 都分 per-label，重點看 severe_toxic、threat、identity_hate。
 4. **Cross-dataset 表**：Civil test 上五類的 ROC-AUC 和 PR-AUC。
 5. **訓練曲線圖**：每個 run 的 val Mean ROC-AUC 隨訓練進度的變化。
+6. **Threshold 指標表**（補充）：第 6.1 節的補充指標，附第 6.5 節中有報告這些指標的參考列，以及「全部預測為 0」的對照列（`results.md` 第 9 節）。
 
 ### 6.4 錯誤分析（以 DeBERTa 為主）
 
@@ -403,12 +405,17 @@ Smoke 輸出可以用 `--outputs outputs/smoke` 測試整個評估流程。Boots
 
 各論文的切分方式不同，表中數字只作為參考範圍，不能當成同一基準下的排名。`evaluate.py` 把這三列以斜體附在主表下方（只有 Mean ROC-AUC，其他欄填「—」）。
 
+Threshold 指標的參考值（`results.md` 第 9 節，補充）：
+- Mazari et al. (2024) Table 3：各 label 與 macro 的 Precision、Recall、F1、MCC。列出 BERT-base（macro F1 59.83%）和 BERT-3_Models (W-AVG)（62.18%）；表中 macro F1 最高為 BERT-Model3 (W-AVG) 的 62.50%。原文未說明 threshold。
+- Rahman et al. (2023) Table 4：只有 accuracy，LR + TF-IDF/word 為 0.898（最高 0.907），原文未說明是 subset 還是 per-label accuracy。
+- Kaggle 只有 Mean ROC-AUC。
+
 ### 6.6 解讀注意
 
 結果：`reports/seed42/analysis.md` 第 1、3 節。
 
 - Jigsaw test 中 threat 只有 211 個正例、severe_toxic 只有 367 個，這兩類的 Δ 容易受少數樣本影響。
-- 主實驗每個設定只跑一個 seed。Δ 很小時，不能直接下結論，要搭配第 7 節的 bootstrap CI 或多 seed 結果。
+- 主實驗每個設定只跑一個 seed。Δ 很小時，不能直接下結論，要搭配第 7 節的 bootstrap CI（多 seed 決定不做）。
 
 ---
 
@@ -427,6 +434,11 @@ Smoke 輸出可以用 `--outputs outputs/smoke` 測試整個評估流程。Boots
 - 第 1、2 項成本很低，主實驗完成後直接做。
 - 若 DeBERTa 的 Δ（E1−E0、E2−E0 或 E2−E1）的 bootstrap CI 跨 0，或 |Δ Mean ROC-AUC| < 0.002，優先做第 3 項。
 - 第 4 項等第 3 項有結果後再決定。
+
+**決定（2026-11-10）**：只做第 1、2 項，第 3、4 項不做。
+- 依上面的規則，原本應優先做第 3 項：DeBERTa 的三個 |Δ Mean ROC-AUC| 都 < 0.002，而且 E1−E0 的 bootstrap CI 跨 0（[−0.0003, +0.0015]）。這是刻意偏離規則的決定，依專題時程與範圍決定。
+- 影響：bootstrap CI 只反映測試資料的抽樣誤差，不含訓練隨機性。因此 CI 不含 0 時，結論只能寫成「在 seed 42 下，差異超出測試抽樣誤差」，不能推論到其他 seed。
+- 第 4 項不做，第 1.5 節「更多資料 vs. 更多 steps」的混淆無法拆開，列為限制。
 
 ---
 
@@ -455,7 +467,7 @@ Smoke 輸出可以用 `--outputs outputs/smoke` 測試整個評估流程。Boots
 | 12GB VRAM 在 batch 16、長度 256 時 OOM | per-device batch 改成 8，搭配 grad-accum 2，effective batch 維持 16；必要時開 gradient checkpointing |
 | 長時間訓練中斷 | 保留 last checkpoint，用 `--resume` 接續 |
 | E1 的 severe_toxic 外部樣本幾乎全是負例，可能拉低該類表現 | 這是預期內的現象，正好用來比較 E1 和 E2，在錯誤分析中討論 |
-| 單一 seed 下差異不顯著 | 使用 Refinement 的 bootstrap CI 和多 seed |
+| 單一 seed 下差異不顯著 | 使用 Refinement 的 bootstrap CI；多 seed 決定不做（第 7 節），訓練隨機性列為限制 |
 | 時程落後 | 先砍 BERT 的 E1／E2，確保 DeBERTa 三組完整 |
 | Civil train CSV 較大（約 600MB） | 只讀需要的欄位；pool 處理完存成 parquet，之後不再讀 CSV |
 
@@ -476,9 +488,9 @@ Smoke 輸出可以用 `--outputs outputs/smoke` 測試整個評估流程。Boots
 **結果**
 - [x] `outputs/results.md`：主表、per-label 表、Δ 表、cross-dataset 表（seed-42 版本收在 `reports/seed42/`）
 - [x] 錯誤分析紀錄（`reports/seed42/analysis.md`）
-- [ ] Refinement 結果（有做的項目）
+- [x] Refinement 結果（有做的項目）：`reports/seed42/results.md` 第 7、8 節、`bootstrap_ci.csv`
 
 **重現性**
-- [x] 所有隨機性都固定為 seed 42：切分、抽樣、shuffle、訓練（Refinement 多 seed 除外）
+- [x] 所有隨機性都固定為 seed 42：切分、抽樣、shuffle、訓練（多 seed 已決定不做，沒有例外）
 - [x] `requirements.txt` 固定版本號
 - [x] 每個 run 都記錄 git commit hash，確保結果對應到特定版本的程式碼（seed-42 Transformer runs 記為 `17a4da8-dirty`、baseline 記為 `49dcf61-dirty`，實際版本見 `reports/seed42/README.md`；之後的 runs 從乾淨的 commit 執行）

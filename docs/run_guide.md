@@ -263,4 +263,4 @@ Checkpoint 請先保留，等我們確認結果沒問題再刪。之後做 demo 
 - BERT 也用 `--batch-size 8` 測過 grad-accum，兩者結果等價；正式 run 請 9 個都用同一個值。
 - 峰值 VRAM 出現在最後的 fp32 預測，三個模型中 DeBERTa 的 allocated 最高（6.47GB）。依第 4 節的規則判斷：12GB 的卡用預設設定；8GB 的卡約有 1.5GB 餘裕，也可以用預設設定，但 smoke test 若出現 OOM 就全部改用 `--batch-size 8`。
 
-Refinement 階段可能還會請你跑額外的 runs，例如不同 seed 或不同外部資料比例。屆時會另外提供指令。
+Refinement 只用現有的預測檔，不需要額外的 runs。
