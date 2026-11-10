@@ -403,9 +403,9 @@ Smoke 輸出可以用 `--outputs outputs/smoke` 測試整個評估流程。Boots
 |---|---|---|
 | Rahman et al. (2023)，baseline 參考 | AUROC 0.973 | 傳統 ML，最佳單一設定 |
 | Mazari et al. (2024)，SOTA 參考 | AUROC 98.63%（Table 2：98.634%） | BERT + Bi-LSTM/Bi-GRU ensemble。在官方 labeled test（63,977 列）上評估，10% training data 留作 validation，但 ensemble 權重依 test 表現設定，等於用 test 調參 |
-| Kaggle 第一名 | 0.98856（private leaderboard，4,539 隊；2026-11-10 查證，來源：MLE-bench 收錄的 Kaggle leaderboard 快照；同一快照第 9、10 名為 0.98775、0.98768） | 官方 test 的 private 部分；本專案的 test 是全部已標註的列，基準接近但不完全相同 |
+| Kaggle 第一名 | 0.98856（private leaderboard，4,539 隊；2026-11-10 查證，來源：MLE-bench 收錄的 Kaggle leaderboard 快照） | 官方 test 的 private 部分；本專案的 test 是全部已標註的列，基準接近但不完全相同 |
 
-各論文的切分方式不同，表中數字只作為參考範圍，不能當成同一基準下的排名。`evaluate.py` 把這三列以斜體附在主表下方（只有 Mean ROC-AUC，其他欄填「—」）。
+各論文的切分方式不同，表中數字只作為參考範圍，不能當成同一基準下的排名；Kaggle 的同一基準分數見下方 late submission 結果。`evaluate.py` 把這三列以斜體附在主表下方（只有 Mean ROC-AUC，其他欄填「—」）。
 
 Threshold 指標的參考值（`results.md` 第 9 節，補充）：
 - Mazari et al. (2024) Table 3：各 label 與 macro 的 Precision、Recall、F1、MCC。列出 BERT-base（macro F1 59.83%）和 BERT-3_Models (W-AVG)（62.18%）；表中 macro F1 最高為 BERT-Model3 (W-AVG) 的 62.50%。原文未說明 threshold。
@@ -413,6 +413,19 @@ Threshold 指標的參考值（`results.md` 第 9 節，補充）：
 - Kaggle 只有 Mean ROC-AUC。
 
 Kaggle late submission（補充）：`test_labels.csv` 只標出未計分的列（-1），沒有標 public／private，所以 private LB 分數無法在本機計算。`src/make_submission.py` 從現有預測產生 `outputs/submissions/{run}.csv`（未計分列填 0.5，不影響分數），由使用者上傳。只提交事先決定的 4 個 run：`tfidf_lr_e0`、`deberta_e2`（val 選出的單一模型）、`ensemble_e0`、`ensemble_e2`，不依 Kaggle 分數挑選；4 個 run 的 public／private LB 分數全部回報，不用來改變任何選擇或結論。
+
+**Late submission 結果（2026-11-10，使用者上傳）**：
+
+| Run | Private LB | Public LB | 本機（全部計分列） | 依 private 快照的名次 |
+|---|---|---|---|---|
+| `tfidf_lr_e0` | 0.98055 | 0.97865 | 0.98006 | 第 2,381–2,389 名（8 隊同分） |
+| `deberta_e2` | 0.98634 | 0.98580 | 0.98620 | 第 600–872 名（272 隊同分） |
+| `ensemble_e0` | 0.98746 | 0.98715 | 0.98737 | 第 15 名 |
+| `ensemble_e2` | 0.98788 | 0.98735 | 0.98774 | 第 4–5 名（1 隊同分） |
+
+- 名次是把 private 分數放進 MLE-bench 的 private leaderboard 快照（4,539 隊）估算的；同分時 Kaggle 依提交時間排序，late submission 排在同分隊伍之後，所以寫成區間。late submission 不會出現在正式 leaderboard 上。
+- Kaggle late submission 只用來和 leaderboard 對照分數的位置。本專案的設定（資料前處理只做 strip、切分方式、模型與超參數、外部資料）都依文獻調查決定，沒有為比賽調整；和當年參賽者的條件也不同（使用比賽後才有的 BERT、RoBERTa、DeBERTa-v3 與 Civil Comments），所以名次不代表方法優劣。
+- private LB 的列是本機 test 的子集，不是獨立驗證；它只確認換成 Kaggle 的計分方式後，結論的方向不變。
 
 ### 6.6 解讀注意
 

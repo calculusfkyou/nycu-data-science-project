@@ -16,7 +16,7 @@
 
 ### 1.1 Transformer 與 baseline
 - 三個 Transformer 的 Mean ROC-AUC（0.9843–0.9864）都高於 TF-IDF + LR baseline（0.9801），差距 +0.004～+0.006；Mean PR-AUC 差距 +0.01～+0.07。
-- Baseline 0.9801 高於 Rahman et al. (2023) 的 0.973。單一模型中最好的 run（BERT E2，0.9864）和 Mazari et al. (2024) 的 0.9863 相當，但 Mazari 依 test 表現設定 ensemble 權重，不是同一基準；比 Kaggle 第一名（private LB 0.98856，大型 ensemble）低約 0.002。
+- Baseline 0.9801 高於 Rahman et al. (2023) 的 0.973。單一模型中最好的 run（BERT E2，0.9864）和 Mazari et al. (2024) 的 0.9863 相當，但 Mazari 依 test 表現設定 ensemble 權重，不是同一基準。和 Kaggle 第一名（private LB 0.98856）的同一基準比較見第 1.8 節。
 - **Threshold 0.5 指標**（`results.md` 第 9 節；Mazari 未說明 threshold，僅供參考）：
   - BERT E0 和 Mazari 的 BERT-base 同為 bert-base-uncased、lr 2e-5、3 epochs（max length 256 vs 128、batch 16 vs 32），結果相近：macro P／R／F1 為 0.480／0.776／0.585，對 0.496／0.777／0.598。
   - BERT E2 的 macro F1 0.626、macro MCC 0.624，略高於 Mazari 最佳 AUC 的 ensemble（0.622、0.616）。
@@ -83,16 +83,20 @@
 | 最佳單一模型（val 選：DeBERTa E2） | 0.9923 | 0.9862 | 0.6638 | 0.5942 | 0.6043 |
 | *Mazari BERT-3_Models (AVG)*（等權重） | — | 0.9856 | — | 0.6051 | 0.6027 |
 | *Mazari BERT-3_Models (W-AVG)*（權重依 test 設定） | — | 0.9863 | — | 0.6218 | 0.6164 |
-| *Kaggle 第一名* | — | 0.98856 | — | — | — |
+| *Kaggle 第一名*（private LB） | — | 0.98856 | — | — | — |
 
-- **和參考值的位置**：ensemble_e2 的 test ROC-AUC 0.9877 高於 Mazari 同樣等權重的 BERT-3_Models (AVG) 0.9856，也高於用 test 設定權重的 W-AVG 0.9863；比 Kaggle 第一名低約 0.0008。macro F1、MCC 也略高於 Mazari（Mazari 未說明 threshold）。以 plan §6.5 記錄的 Kaggle private leaderboard 快照（第 9 名 0.98775、第 10 名 0.98768）估算，ensemble_e2（0.98774）約在 4,539 隊中的第 10 名；但 Kaggle private LB 只用官方 test 的一部分，這個名次只能參考。
+- **和參考值的位置**：ensemble_e2 的 test ROC-AUC 0.9877 高於 Mazari 同樣等權重的 BERT-3_Models (AVG) 0.9856，也高於用 test 設定權重的 W-AVG 0.9863；macro F1、MCC 也略高於 Mazari（Mazari 未說明 threshold）。
+- **Kaggle late submission（和 leaderboard 對照）**：上表的 test 分數用的是全部計分列；為了和 leaderboard 在同一計分方式下對照，把 4 個事先決定的 run 提交為 late submission（結果見 plan §6.5）。Kaggle late submission 只用來和 leaderboard 對照分數的位置。本專案的設定（資料前處理只做 strip、切分方式、模型與超參數、外部資料）都依文獻調查決定，沒有為比賽調整；和當年參賽者的條件也不同（使用比賽後才有的 BERT、RoBERTa、DeBERTa-v3 與 Civil Comments），所以名次不代表方法優劣。
+  - Private LB：ensemble_e2 0.98788、ensemble_e0 0.98746、DeBERTa E2 0.98634、TF-IDF baseline 0.98055。
+  - ensemble_e2 比 Kaggle 第一名（0.98856）低 0.0007；放進 private leaderboard 快照（4,539 隊）約為第 4–5 名。最佳單一模型 DeBERTa E2 約為第 600–872 名，baseline 約為第 2,381–2,389 名。
+  - 外部資料在 ensemble 上的差異，在 private LB 上也是同方向：E2 − E0 = +0.0004（public +0.0002）。private LB 的列是本機 test 的子集，已包含在 bootstrap CI 裡，所以這不是獨立驗證，只確認換成 Kaggle 的計分方式後方向不變。
 - **ensemble 本身的效果**：ensemble_e2 比最佳單一模型高 +0.0015（val 選的 DeBERTa E2），比 test 上最好的單一模型 BERT E2 高 +0.0014（點估計，未做 CI）。
 - **外部資料在 ensemble 上的增益變小**：bootstrap CI（`results.md` 第 7 節）
   - E1 − E0：+0.0001 [−0.0002, +0.0004]，含 0
   - E2 − E0：+0.0004 [+0.0001, +0.0006]，不含 0
   - E2 − E1：+0.0002 [−0.0000, +0.0006]，含 0
 - 單一模型的 E2 − E0 是 +0.0008～+0.0019，ensemble 只剩 +0.0004。外部資料帶來的改善有一部分和 ensemble 的效果重疊（推測，未驗證）。threat 仍是增益最明顯的 label（E2 − E0 +0.0009 [+0.0002, +0.0018]）。
-- 小結：ensemble 的 test ROC-AUC 高於 Mazari 的報告值，但評估設定仍不完全相同（Mazari 依 test 表現設定權重），只能說具競爭力；外部資料（soft label）在 ensemble 上仍有小幅但 CI 不含 0 的增益，hard label 則沒有。
+- 小結：ensemble 的 test ROC-AUC 高於 Mazari 的報告值（評估設定仍不完全相同，Mazari 依 test 表現設定權重），在 Kaggle private LB 上的分數也接近前幾名，但設定依文獻決定、條件和參賽者不同，名次只是對照，只能說具競爭力；外部資料（soft label）在 ensemble 上仍有小幅但 CI 不含 0 的增益，hard label 則沒有。
 
 ---
 
