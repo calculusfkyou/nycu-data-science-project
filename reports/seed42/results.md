@@ -18,6 +18,11 @@ Metrics follow plan §6.1; F1 uses threshold 0.5.
 | deberta_e0 | deberta | e0 | 0.9899 | 0.9844 | 0.6561 | 0.5963 |
 | deberta_e1 | deberta | e1 | 0.9909 | 0.9849 | 0.6461 | 0.5937 |
 | deberta_e2 | deberta | e2 | 0.9923 | 0.9862 | 0.6638 | 0.5942 |
+| *Rahman et al. (2023)* | baseline 參考：傳統 ML | — | — | 0.973 | — | — |
+| *Mazari et al. (2024)* | SOTA 參考：BERT + Bi-LSTM/Bi-GRU ensemble | — | — | 0.9863 | — | — |
+| *Kaggle 第一名* | private leaderboard，4,539 隊 | — | — | 0.98856 | — | — |
+
+斜體列是參考值（plan §6.5），評估設定和本專案不同，只作為範圍參考，不是同一基準下的排名：Rahman 用自己的切分；Mazari 在官方 labeled test（63,977 列）上評估，但 ensemble 權重依 test 表現設定；Kaggle private leaderboard 用的是官方 test 中的 private 部分，本表的 test 是全部已標註的列。
 
 ## 2. Per-label：Jigsaw official labeled test
 

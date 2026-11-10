@@ -23,6 +23,12 @@ DELTAS = [("e1", "e0", "E1 − E0（hard augmentation）"), ("e2", "e0", "E2 −
 FOCUS_LABELS = ["threat", "identity_hate"]  # plan §6.4: read 20 E0 false negatives each
 ERROR_MODELS = ["deberta"]
 N_SAMPLES = 20
+# Mean ROC-AUC values as listed in plan §6.5. Different setups, so a range, not a ranking.
+REFERENCES = [
+    ("Rahman et al. (2023)", "baseline 參考：傳統 ML", "0.973"),
+    ("Mazari et al. (2024)", "SOTA 參考：BERT + Bi-LSTM/Bi-GRU ensemble", "0.9863"),
+    ("Kaggle 第一名", "private leaderboard，4,539 隊", "0.98856"),
+]
 
 
 def load_runs(outdir: Path, truth: dict) -> pd.DataFrame:
@@ -72,7 +78,11 @@ def tables(metrics) -> list[str]:
     md += ["## 1. 主表：Jigsaw official labeled test", ""]
     md += md_table(["Run", "Model", "Setting", "Val mean ROC-AUC", "Mean ROC-AUC", "Mean PR-AUC", "Macro F1"],
                    [[r.run, r.model, r.setting, fmt(val.loc[r.run, "mean_roc_auc"]), fmt(r.mean_roc_auc),
-                     fmt(r.mean_pr_auc), fmt(r.macro_f1)] for r in test.itertuples()])
+                     fmt(r.mean_pr_auc), fmt(r.macro_f1)] for r in test.itertuples()]
+                   + [[f"*{name}*", desc, "—", "—", auc, "—", "—"] for name, desc, auc in REFERENCES])
+    md += ["斜體列是參考值（plan §6.5），評估設定和本專案不同，只作為範圍參考，不是同一基準下的排名："
+           "Rahman 用自己的切分；Mazari 在官方 labeled test（63,977 列）上評估，但 ensemble 權重依 test 表現設定；"
+           "Kaggle private leaderboard 用的是官方 test 中的 private 部分，本表的 test 是全部已標註的列。", ""]
 
     md += ["## 2. Per-label：Jigsaw official labeled test", ""]
     for key, name in [("roc_auc", "ROC-AUC"), ("pr_auc", "PR-AUC")]:

@@ -23,7 +23,7 @@ Group A · Team 5（吳傢澂、歐冠廷、吳承羲）
 | Data Understanding | ✅ 完成 | EDA 與補充分析已完成，結論整理於第 3 節 |
 | Data Preparation | ✅ 完成 | `src/prepare_data.py`；產出與統計見 `data/processed/data_summary.md` |
 | Data Modeling | ✅ 完成 | baseline 與 9 個 seed-42 runs；結果見 `reports/seed42/` |
-| Evaluation | 🔄 表格完成 | `evaluate.py` 的結果表與 FP／FN 統計已產出；第 6.4 節人工閱讀錯誤樣本、第 6.5 節文獻比較、第 6.6 節解讀待補 |
+| Evaluation | 🔄 表格完成 | `evaluate.py` 的結果表與 FP／FN 統計已產出；第 6.5 節參考列已加入主表；第 6.4 節人工閱讀錯誤樣本、第 6.6 節解讀待補 |
 | Refinement | ⬜ | 等主實驗完成後決定要做哪些 |
 | Deployment（選做） | ⬜ | |
 
@@ -395,10 +395,10 @@ Smoke 輸出可以用 `--outputs outputs/smoke` 測試整個評估流程。Boots
 | 參考 | 數值 | 備註 |
 |---|---|---|
 | Rahman et al. (2023)，baseline 參考 | AUROC 0.973 | 傳統 ML，最佳單一設定 |
-| Mazari et al. (2024)，SOTA 參考 | AUROC 98.63% | BERT + Bi-LSTM/Bi-GRU ensemble，自行保留 10% 當 validation |
-| Kaggle leaderboard | 撰寫報告時查證 | 和官方 labeled test 的 Mean ROC-AUC 同一個基準 |
+| Mazari et al. (2024)，SOTA 參考 | AUROC 98.63%（Table 2：98.634%） | BERT + Bi-LSTM/Bi-GRU ensemble。在官方 labeled test（63,977 列）上評估，10% training data 留作 validation，但 ensemble 權重依 test 表現設定，等於用 test 調參 |
+| Kaggle 第一名 | 0.98856（private leaderboard，4,539 隊；2026-11-10 查證，來源：MLE-bench 收錄的 Kaggle leaderboard 快照） | 官方 test 的 private 部分；本專案的 test 是全部已標註的列，基準接近但不完全相同 |
 
-各論文的切分方式不同，表中數字只作為參考範圍，不能當成同一基準下的排名。
+各論文的切分方式不同，表中數字只作為參考範圍，不能當成同一基準下的排名。`evaluate.py` 把這三列以斜體附在主表下方（只有 Mean ROC-AUC，其他欄填「—」）。
 
 ### 6.6 解讀注意
 - Jigsaw test 中 threat 只有 211 個正例、severe_toxic 只有 367 個，這兩類的 Δ 容易受少數樣本影響。
