@@ -295,7 +295,7 @@ nycu-data-science-project/
 | 模型權重 | 一律以 fp32 載入（`dtype=torch.float32`）。transformers v5 預設沿用 checkpoint 的 dtype，而 `deberta-v3-base` 存成 fp16，會導致 fp16 master weights 發散 | （補充） |
 | Per-device batch | 16；OOM 時用 `--batch-size 8`，程式自動設 `gradient_accumulation_steps=2`，effective batch 維持 16 | （補充） |
 | Padding | dynamic padding（`DataCollatorWithPadding`）＋ length grouping（v5 寫法：`train_sampling_strategy="group_by_length"`）。v5 開啟後連 eval／predict 也會打亂順序，所以 eval 改用 sequential sampler，預測依長度排序後再還原原順序。訓練的 length-grouped 順序只由 (seed, epoch) 決定，中途 `--resume` 的那個 epoch 和沒中斷時完全相同（v5 內建 sampler 在中途接續時順序會錯） | （補充） |
-| 推論精度 | 最終的 val／test 預測用 fp32（不經 bf16 autocast），避免 logits 落在 bf16 格點上造成 ROC-AUC 同分；訓練中的 val 評估仍用 bf16。val 的 fp32 預測要和 Trainer 的 bf16 預測通過對齊檢查：逐元素差的 99.9 百分位 < 0.05，且沒有任何值差超過 0.25（兩者都記在 `runtime.json`），否則中止 | （補充） |
+| 推論精度 | 最終的 val／test 預測用 fp32（不經 bf16 autocast），避免 logits 落在 bf16 格點上造成 ROC-AUC 同分；訓練中的 val 評估仍用 bf16。val 的 fp32 預測要和 Trainer 的 bf16 預測通過對齊檢查：逐元素差的 99.9 百分位 < 0.05（記在 `runtime.json` 的 `val_p999_abs_diff_fp32_vs_bf16`），且差超過 0.25 的值必須為 0 個（只檢查，不記錄），否則中止 | （補充） |
 | Evaluation 頻率 | 每 0.5 epoch 對 val 評估一次，共 6 個候選 checkpoint；訓練結束時 Trainer 會再評估一次最後一步 | （補充） |
 | Checkpoint 格式 | 存檔用 `save_pretrained(save_original_format=False)`，保留 runtime 的 key 名稱。`bert-base-uncased` 使用舊的 `LayerNorm.gamma/beta`，transformers 5.22.1 預設存檔會改回舊名，但 Trainer 載回 best／resume checkpoint 時用 `load_state_dict(strict=False)` 且不做轉換，會靜默跳過所有 LayerNorm 權重。回歸測試：`tests/test_checkpoint_roundtrip.py` | （補充） |
 | Checkpoint 保存 | 保留 best 和 last：`save_total_limit=2`、`load_best_model_at_end=True`、`metric_for_best_model="mean_roc_auc"` | （補充） |
@@ -303,6 +303,7 @@ nycu-data-science-project/
 - 同一個 run 內，所有 setting 都用相同的超參數，不針對單一 setting 調參。
 - `save_steps` 要和 `eval_steps` 對齊，這樣 best checkpoint 才一定會被保存。
 - last checkpoint 用於中斷後接續：`--resume` 會轉成 `trainer.train(resume_from_checkpoint=True)`。
+- seed-42 的 9 個 runs 用的是舊版對齊檢查（`reports/seed42/README.md` 的程式版本），條件只有「逐元素差的最大值 < 0.05」。`runtime.json` 中逐元素差只記 `val_max_abs_diff_fp32_vs_bf16`（9 個 runs 為 0.006–0.047），沒有 `val_p999_abs_diff_fp32_vs_bf16`。之後若再跑（含 smoke），會用上表的新檢查。
 
 ### 5.3 執行順序
 1. **Smoke test**：`--smoke` 只取 1% 的 train、val 和兩個 test（seed 42），跑 1 epoch，輸出到 `outputs/smoke/`。
@@ -340,6 +341,12 @@ nycu-data-science-project/
 - `config.json` 記錄訓練資料和每個 eval split 的 data fingerprint（`common.fingerprint()`），以及 Hugging Face 權重的 commit（`checkpoint_revision`）。`evaluate.py` 會和本機的 `data/processed` 比對（訓練資料用 `common.load_train()` 重建後比對），不一致就停止，避免在不同電腦產生的資料上對錯列，或 E1／E2 用到不同批外部樣本。
 - `--resume` 時保留原本的 `config.json`，只在 `resume_sessions` 附加這次的環境紀錄。
 - baseline 也輸出相同格式，放在 `outputs/tfidf_lr_e0/`；另有 `model.joblib`（第 5.1 節），沒有 checkpoint 和 `log_history.json`。
+- seed-42 runs 在本機的實際內容：
+  - 每個 run 資料夾裡沒有 `checkpoint-*/`，只有推論版的 best checkpoint `{run}_best_step-N/`，例如 `deberta_e2_best_step-035900/`。
+  - 推論版只有 4 個檔案：`model.safetensors`、`config.json`、`tokenizer.json`、`tokenizer_config.json`。
+  - 沒有 optimizer、scheduler、RNG 和 Trainer 狀態，不能用來 `--resume`。
+  - 完整的 best／last checkpoint 留在執行者的電腦上，`runtime.json` 的 `best_checkpoint` 記錄的也是執行者電腦上的路徑。
+  - 說明見本機 `outputs/README.txt`（gitignored）。
 
 ### 5.5 GPU 時間粗估
 - 公式：時間 ≈ epochs × 訓練筆數 ÷ samples/s，再加上 val 評估和三個資料集的推論。
